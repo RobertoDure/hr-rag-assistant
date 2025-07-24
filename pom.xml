@@ -15,7 +15,7 @@
     <description>HR Rag Assistant</description>
     <url/>
     <properties>
-        <java.version>21</java.version>
+        <java.version>23</java.version>
         <spring-ai.version>1.0.0-M1</spring-ai.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <spring-ai-tika-document-reader.version>1.0.0</spring-ai-tika-document-reader.version>
@@ -24,8 +24,12 @@
         <spring-ai-mcp.version>1.0.0</spring-ai-mcp.version>
         <hypersistence-utils-hibernate-63.version>3.7.3</hypersistence-utils-hibernate-63.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+        <pdfbox.version>3.0.5</pdfbox.version>
+        <tika-core.version>2.9.4</tika-core.version>
+        <tika-parsers-standard-package.version>2.9.4</tika-parsers-standard-package.version>
+        <stanford-corenlp.version>4.5.4</stanford-corenlp.version>
+        <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
     </properties>
-
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -73,6 +77,16 @@
             <version>${spring-ai-tika-document-reader.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika-core.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+            <version>${tika-parsers-standard-package.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-mcp</artifactId>
             <version>${spring-ai-mcp.version}</version>
@@ -97,6 +111,29 @@
             <artifactId>hypersistence-utils-hibernate-63</artifactId>
             <version>${hypersistence-utils-hibernate-63.version}</version>
         </dependency>
+        <!-- Stanford CoreNLP for advanced NLP skill extraction -->
+        <dependency>
+            <groupId>edu.stanford.nlp</groupId>
+            <artifactId>stanford-corenlp</artifactId>
+            <version>${stanford-corenlp.version}</version>
+            <classifier>models</classifier>
+        </dependency>
+        <dependency>
+            <groupId>edu.stanford.nlp</groupId>
+            <artifactId>stanford-corenlp</artifactId>
+            <version>${stanford-corenlp.version}</version>
+        </dependency>
+        <!-- Explicit PDFBox dependencies -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${pdfbox.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox-io</artifactId>
+            <version>${pdfbox.version}</version>
+        </dependency>
     </dependencies>
     <dependencyManagement>
         <dependencies>
@@ -107,6 +144,22 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Explicit PDFBox version management to resolve conflicts -->
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>pdfbox</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>pdfbox-io</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>fontbox</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -115,10 +168,10 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
+                <version>${maven-compiler-plugin.version}</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.mapstruct</groupId>
