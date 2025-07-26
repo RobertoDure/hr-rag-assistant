@@ -20,18 +20,27 @@ public class UploadedDocument {
     @Column(name = "id")
     private String id;
 
-    @Column(name = "file_name", nullable = false, length = 500)
-    private String fileName;
+    @Column(name = "filename", nullable = false, length = 255)
+    private String filename;
 
-    @Column(name = "file_size", nullable = false)
-    private Long fileSize;
-
-    @Column(name = "content_type", nullable = false, length = 100)
+    @Column(name = "content_type", length = 100)
     private String contentType;
 
+    @Column(name = "file_size")
+    private Long fileSize;
+
+    @Column(name = "file_path", length = 500)
+    private String filePath;
+
+    @Column(name = "status", length = 50)
+    private String status = "UPLOADED";
+
     @CreationTimestamp
-    @Column(name = "upload_timestamp")
-    private LocalDateTime uploadTimestamp;
+    @Column(name = "uploaded_at")
+    private LocalDateTime uploadedAt;
+
+    @Column(name = "processed_at")
+    private LocalDateTime processedAt;
 
     @PrePersist
     public void prePersist() {

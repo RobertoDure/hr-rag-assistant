@@ -18,7 +18,6 @@ public class CandidateRanking {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id")
     private UUID id;
 
     @Column(name = "job_analysis_id", nullable = false)
