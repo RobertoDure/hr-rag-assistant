@@ -1,0 +1,79 @@
+.App {
+  text-align: left;
+}
+
+.App-header {
+  background-color: #282c34;
+  padding: 20px;
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+.dashboard-stats .card {
+  transition: transform 0.2s ease-in-out;
+}
+
+.dashboard-stats .card:hover {
+  transform: translateY(-2px);
+}
+
+.candidate-card {
+  transition: all 0.3s ease;
+  border-left: 4px solid transparent;
+}
+
+.candidate-card:hover {
+  border-left-color: #007bff;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.analysis-result {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 15px;
+}
+
+.match-score {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.skill-tag {
+  display: inline-block;
+  margin: 2px;
+  padding: 4px 8px;
+  background-color: #e9ecef;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+
+.upload-area {
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.candidate-highlight {
+  border-left: 3px solid #28a745;
+  padding-left: 10px;
+  margin: 5px 0;
+}
+
+.top-candidate {
+  background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+  border: 2px solid #28a745;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
