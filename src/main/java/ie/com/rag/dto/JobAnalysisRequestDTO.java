@@ -8,7 +8,8 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class JobAnalysisRequestDTO {
+public class
+JobAnalysisRequestDTO {
 
     private String jobTitle;
     private String jobDescription;
