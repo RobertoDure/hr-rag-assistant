@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hr-ragwiser
+  labels:
+    name: hr-ragwiser
+    app: hr-rag-assistant

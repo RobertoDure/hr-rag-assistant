@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hr-ragwiser-config
+  namespace: hr-ragwiser
+data:
+  # Database configuration
+  POSTGRES_DB: "rag_hr_db"
+  POSTGRES_HOST: "postgres-service"
+  POSTGRES_PORT: "5432"
+
+  # Backend configuration
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres-service:5432/rag_hr_db"
+  SPRING_DATASOURCE_USERNAME: "postgres"
+  SPRING_PROFILES_ACTIVE: "prod"
+
+  # Frontend configuration
+  REACT_APP_BACKEND_URL: "http://backend-service:8080"
+

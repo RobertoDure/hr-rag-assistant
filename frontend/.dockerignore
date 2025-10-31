@@ -1,0 +1,108 @@
+# Dependencies
+node_modules/
+
+# Testing
+coverage/
+
+# Production build (keep this for Docker build)
+# build/
+
+# Misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+@echo off
+REM Quick deployment script for HR RagWiser to Kubernetes
+
+echo ========================================
+echo HR RagWiser Kubernetes Deployment Script
+echo ========================================
+echo.
+
+REM Check if kubectl is installed
+kubectl version --client >nul 2>&1
+if %errorlevel% neq 0 (
+    echo ERROR: kubectl is not installed or not in PATH
+    exit /b 1
+)
+
+REM Check if Docker is running
+docker info >nul 2>&1
+if %errorlevel% neq 0 (
+    echo ERROR: Docker is not running
+    exit /b 1
+)
+
+echo Step 1: Creating namespace...
+kubectl create namespace hr-ragwiser --dry-run=client -o yaml | kubectl apply -f -
+
+echo.
+echo Step 2: Applying Kubernetes manifests...
+kubectl apply -f k8s/configmap.yaml -n hr-ragwiser
+kubectl apply -f k8s/secret.yaml -n hr-ragwiser
+kubectl apply -f k8s/postgres-pvc.yaml -n hr-ragwiser
+kubectl apply -f k8s/postgres-deployment.yaml -n hr-ragwiser
+kubectl apply -f k8s/postgres-service.yaml -n hr-ragwiser
+
+echo.
+echo Step 3: Waiting for PostgreSQL to be ready...
+kubectl wait --for=condition=ready pod -l app=postgres --timeout=300s -n hr-ragwiser
+
+echo.
+echo Step 4: Deploying backend...
+kubectl apply -f k8s/backend-deployment.yaml -n hr-ragwiser
+kubectl apply -f k8s/backend-service.yaml -n hr-ragwiser
+
+echo.
+echo Step 5: Deploying frontend...
+kubectl apply -f k8s/frontend-deployment.yaml -n hr-ragwiser
+kubectl apply -f k8s/frontend-service.yaml -n hr-ragwiser
+
+echo.
+echo Step 6: Applying Ingress...
+kubectl apply -f k8s/ingress.yaml -n hr-ragwiser
+
+echo.
+echo Step 7: Waiting for deployments to be ready...
+kubectl rollout status deployment/postgres -n hr-ragwiser --timeout=300s
+kubectl rollout status deployment/backend -n hr-ragwiser --timeout=300s
+kubectl rollout status deployment/frontend -n hr-ragwiser --timeout=300s
+
+echo.
+echo ========================================
+echo Deployment Status
+echo ========================================
+kubectl get all -n hr-ragwiser
+
+echo.
+echo ========================================
+echo Access Information
+echo ========================================
+echo Frontend: http://localhost:30000
+echo Backend API: http://localhost:30080
+echo.
+echo To view logs:
+echo   kubectl logs -f deployment/backend -n hr-ragwiser
+echo   kubectl logs -f deployment/frontend -n hr-ragwiser
+echo.
+echo To delete deployment:
+echo   kubectl delete namespace hr-ragwiser
+echo.
+echo ========================================
+echo Deployment completed successfully!
+echo ========================================
+

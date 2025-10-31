@@ -1,0 +1,49 @@
+# Maven
+target/
+!target/assistant-0.0.1-SNAPSHOT.jar
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+src/test/
+
+# Frontend (when building backend image)
+frontend/node_modules/
+frontend/build/
+frontend/.env
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+
+# Kubernetes
+k8s/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
