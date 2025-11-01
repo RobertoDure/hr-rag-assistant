@@ -14,11 +14,17 @@ HR Rag Assistant is a full-stack application that combines Spring Boot backend w
 - **Vector Storage**: PostgreSQL with pgvector for semantic search capabilities
 - **AI-Powered Q&A**: Ask questions about uploaded documents using natural language
 
+![Upload CV](docs/upload_CV.png)
+
+![Uploaded CV](docs/uploaded_CV.png)
+
 ### 👥 Candidate Management
 - **Complete Candidate Profiles**: Name, email, phone, skills, experience, education
 - **Skills Extraction**: Automatic identification of technical and soft skills
 - **Experience Analysis**: Years of experience and career history extraction
 - **Education Parsing**: Educational background and qualifications
+
+![Candidate Management](docs/candidate_management.png)
 
 ### 🔍 Job Analysis & Matching
 - **Smart Job Analysis**: Define job requirements with skills, experience, and education criteria
@@ -30,17 +36,16 @@ HR Rag Assistant is a full-stack application that combines Spring Boot backend w
   - CV content relevance (10% weight)
 - **AI Recommendations**: Generated insights for top candidates
 
+![Job Analysis](docs/job_analyze.png)
+
 ### 📊 Dashboard & Analytics
 - **Real-time Metrics**: Total candidates, weekly/monthly uploads, skill analytics
 - **Visual Insights**: Top skills distribution, candidate statistics
 - **Activity Tracking**: Recent uploads and system activities
 - **Comprehensive Logging**: System monitoring with exportable logs
 
-### 🤖 AI Integration
-- **OpenAI GPT-4**: Advanced language processing and recommendations
-- **Embeddings**: Text-embedding-3-small for semantic search
-- **Spring AI Framework**: Seamless AI integration with Spring Boot
-- **Configurable Parameters**: Temperature, max tokens, and model settings
+![Dashboard](docs/dashboard.png)
+
 
 ## 🏗️ Architecture
 
