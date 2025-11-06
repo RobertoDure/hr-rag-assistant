@@ -7,7 +7,6 @@ import axios from 'axios';
 import Dashboard from './components/Dashboard';
 import DocumentUpload from './components/DocumentUpload';
 import CandidateList from './components/CandidateList';
-import QuestionAsking from './components/QuestionAsking';
 import JobAnalysisForm from './components/JobAnalysisForm';
 
 function App() {
@@ -87,10 +86,6 @@ function App() {
 
           <Tab eventKey="analysis" title="🔍 Job Analysis">
             <JobAnalysisForm />
-          </Tab>
-
-          <Tab eventKey="questions" title="❓ Ask Questions">
-            <QuestionAsking />
           </Tab>
         </Tabs>
       </Container>
