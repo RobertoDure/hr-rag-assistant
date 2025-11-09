@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: localhost:5000/ragwiserfront:latest
+        image: 127.0.0.1:5000/hr-ragwiser-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
