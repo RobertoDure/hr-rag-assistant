@@ -84,7 +84,6 @@ frontend/src/
 │   ├── DocumentUpload.js            # CV upload interface
 │   ├── CandidateList.js            # Candidate management interface
 │   ├── JobAnalysisForm.js          # Job analysis and matching
-│   └── QuestionAsking.js           # RAG-based Q&A interface
 └── App.css                         # Application styling
 ```
 
