@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: localhost:5000/hr-ragwiser-backend:latest
+        image: https://index.docker.io/v1/your_dockerhub_user/hr-ragwiser-backend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

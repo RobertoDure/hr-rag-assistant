@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: localhost:5000/hr-ragwiser-frontend:latest
+        image: https://index.docker.io/v1/your_dockerhub_user/hr-ragwiser-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 3000

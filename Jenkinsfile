@@ -7,16 +7,17 @@ pipeline {
         GIT_BRANCH = 'main'
 
         // Docker configuration
-        DOCKER_REGISTRY = 'https://hub.docker.com/repository/docker/robertodure/'
-        BACKEND_IMAGE = "${DOCKER_REGISTRY}/hr-ragwiser-backend"
-        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/hr-ragwiser-frontend"
+        DOCKER_REGISTRY = 'https://index.docker.io/v1/'
+        DOCKER_USERNAME = 'YOUR_DOCKERHUB_USERNAME' // Update with your Docker Hub username
+        BACKEND_IMAGE = "YOUR_DOCKERHUB_USERNAME/hr-ragwiser-backend"
+        FRONTEND_IMAGE = "YOUR_DOCKERHUB_USERNAME/hr-ragwiser-frontend"
         POSTGRES_IMAGE = "pgvector/pgvector:pg16"
         IMAGE_TAG = "${BUILD_NUMBER}"
 
         // Kubernetes configuration
         K8S_NAMESPACE = 'hr-ragwiser'
         K8S_DEPLOYMENT_PATH = 'k8s'
-
+        KUBECONFIG = '/var/jenkins_home/kube/config'
         // Maven configuration
         MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
     }
@@ -47,9 +48,9 @@ pipeline {
                 script {
                     echo "=== Building Backend with Maven ==="
                     if (isUnix()) {
-                        sh 'mvn clean package -DskipTests'
+                        sh 'mvn clean install -DskipTests'
                     } else {
-                        bat 'mvn clean package -DskipTests'
+                        bat 'mvn clean install -DskipTests'
                     }
                 }
             }
@@ -75,7 +76,6 @@ pipeline {
                         script {
                             echo "=== Building Backend Docker Image ==="
                             docker.build("${BACKEND_IMAGE}:${IMAGE_TAG}", "-f Dockerfile .")
-                            docker.build("${BACKEND_IMAGE}:latest", "-f Dockerfile .")
                         }
                     }
                 }
@@ -85,7 +85,6 @@ pipeline {
                         script {
                             echo "=== Building Frontend Docker Image ==="
                             docker.build("${FRONTEND_IMAGE}:${IMAGE_TAG}", "-f frontend/Dockerfile ./frontend")
-                            docker.build("${FRONTEND_IMAGE}:latest", "-f frontend/Dockerfile ./frontend")
                         }
                     }
                 }
@@ -94,13 +93,10 @@ pipeline {
 
         stage('Push Docker Images') {
             steps {
-                script {
-                    echo "=== Pushing Docker Images to Local Registry ==="
-                    docker.withRegistry("${DOCKER_REGISTRY}") {
-                        docker.image("${BACKEND_IMAGE}:${IMAGE_TAG}").push()
-                        docker.image("${BACKEND_IMAGE}:latest").push()
-                        docker.image("${FRONTEND_IMAGE}:latest").push()
-                    }
+                withCredentials([usernamePassword(credentialsId: 'docker', passwordVariable: 'dockerPassword', usernameVariable: 'dockerUser')]) {
+                sh 'echo ${dockerPassword} | docker login -u ${dockerUser} --password-stdin'
+                sh 'docker push ${BACKEND_IMAGE}:${IMAGE_TAG}'
+                sh 'docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}'
                 }
             }
         }
@@ -179,6 +175,7 @@ pipeline {
                             echo "Waiting for deployments to be ready..."
                             kubectl rollout status deployment/postgres -n ${K8S_NAMESPACE} --timeout=300s
                             kubectl rollout status deployment/frontend -n ${K8S_NAMESPACE} --timeout=300s
+                            kubectl rollout status deployment/backend -n ${K8S_NAMESPACE} --timeout=300s
 
                             echo "\\n=== Deployment Status ==="
                             kubectl get deployments -n ${K8S_NAMESPACE}
