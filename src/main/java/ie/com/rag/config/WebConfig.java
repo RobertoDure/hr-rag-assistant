@@ -12,6 +12,8 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOrigins("http://localhost:3000") // React app will run on port 3000
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+
+
                 .allowedHeaders("*")
                 .allowCredentials(true);
     }
