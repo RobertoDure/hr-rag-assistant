@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: rag_hr_assistant_test
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  ai:
+    openai:
+      api-key: test-api-key
+      chat:
+        options:
+          model: gpt-4o-mini
+          temperature: 0.7
+      embedding:
+        options:
+          model: text-embedding-3-small
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+  cache:
+    type: simple
+  security:
+    user:
+      name: admin
+      password: testpassword
+
+jwt:
+  secret: dGVzdC1zZWNyZXQta2V5LWZvci1qd3QtdG9rZW4tdGVzdGluZy1wdXJwb3Nlcy1vbmx5LW11c3QtYmUtbG9uZy1lbm91Z2g=
+  expiration: 86400000
+
+logging:
+  level:
+    ie.com.rag: DEBUG
+    org.springframework.security: INFO
+

@@ -1,6 +1,6 @@
 spring:
   application:
-    name: rag_hr_assistant
+    name: HR Rag Wiser
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST}:5433/${POSTGRES_DB}
     username: ${POSTGRES_USER}
@@ -19,20 +19,20 @@ spring:
       column: embedding
       dimension: 1536
       distance: cosine
-# Implement OpenRouter API as an alternative LLM provider
-#    openrouter:
-#      chat:
-#        options:
-#          models:
-#            - google/gemini-2.0-flash-exp:free
-#            - x-ai/grok-4-fast:free
-#            - openai/gpt-oss-120b:free
-#    openai:
-#      base_url: https://openrouter.ai/api
-#      api-key: ${OPENROUTER_API_KEY}
-#      chat:
-#        options:
-#          model: x-ai/grok-4-fast:free
+    # Implement OpenRouter API as an alternative LLM provider
+    #    openrouter:
+    #      chat:
+    #        options:
+    #          models:
+    #            - google/gemini-2.0-flash-exp:free
+    #            - x-ai/grok-4-fast:free
+    #            - openai/gpt-oss-120b:free
+    #    openai:
+    #      base_url: https://openrouter.ai/api
+    #      api-key: ${OPENROUTER_API_KEY}
+    #      chat:
+    #        options:
+    #          model: x-ai/grok-4-fast:free
     openai:
       api-key: ${OPENAI_API_KEY}
       chat:
