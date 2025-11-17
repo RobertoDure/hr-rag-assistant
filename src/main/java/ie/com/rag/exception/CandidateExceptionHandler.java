@@ -2,6 +2,7 @@ package ie.com.rag.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -36,6 +37,7 @@ public class CandidateExceptionHandler {
                 .error("Candidate Not Found")
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
+                .transactionId(MDC.get("transactionId"))
                 .build();
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
@@ -62,6 +64,7 @@ public class CandidateExceptionHandler {
                 .error("Validation Failed")
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
+                .transactionId(MDC.get("transactionId"))
                 .fieldErrors(fieldErrors)
                 .build();
 
@@ -83,6 +86,7 @@ public class CandidateExceptionHandler {
                 .error("Save Operation Failed")
                 .message("Failed to save candidate. Please try again.")
                 .path(request.getDescription(false).replace("uri=", ""))
+                .transactionId(MDC.get("transactionId"))
                 .build();
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
@@ -103,6 +107,7 @@ public class CandidateExceptionHandler {
                 .error("Internal Server Error")
                 .message("An unexpected error occurred. Please try again later.")
                 .path(request.getDescription(false).replace("uri=", ""))
+                .transactionId(MDC.get("transactionId"))
                 .build();
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
@@ -117,7 +122,8 @@ public class CandidateExceptionHandler {
             String error,
             String message,
             String path,
-            Map<String, String> fieldErrors
+            Map<String, String> fieldErrors,
+            String transactionId
     ) {
         public static Builder builder() {
             return new Builder();
@@ -130,6 +136,7 @@ public class CandidateExceptionHandler {
             private String message;
             private String path;
             private Map<String, String> fieldErrors;
+            private String transactionId;
 
             public Builder timestamp(LocalDateTime timestamp) {
                 this.timestamp = timestamp;
@@ -160,9 +167,13 @@ public class CandidateExceptionHandler {
                 this.fieldErrors = fieldErrors;
                 return this;
             }
+            public Builder transactionId(String transactionId) {
+                this.transactionId = transactionId;
+                return this;
+            }
 
             public ErrorResponse build() {
-                return new ErrorResponse(timestamp, status, error, message, path, fieldErrors);
+                return new ErrorResponse(timestamp, status, error, message, path, fieldErrors, transactionId);
             }
         }
     }
