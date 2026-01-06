@@ -1,5 +1,7 @@
 package ie.com.rag.exception;
 
+import lombok.Getter;
+
 import java.util.List;
 
 /**
@@ -8,6 +10,7 @@ import java.util.List;
  */
 public class CandidateValidationException extends RuntimeException {
 
+    @Getter
     private final List<ValidationError> errors;
 
     public CandidateValidationException(String message, List<ValidationError> errors) {
@@ -18,10 +21,6 @@ public class CandidateValidationException extends RuntimeException {
     public CandidateValidationException(String message) {
         super(message);
         this.errors = List.of();
-    }
-
-    public List<ValidationError> getErrors() {
-        return errors;
     }
 
     /**

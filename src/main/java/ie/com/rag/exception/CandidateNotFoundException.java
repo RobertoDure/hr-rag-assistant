@@ -1,12 +1,16 @@
 package ie.com.rag.exception;
 
+import lombok.Getter;
+
 /**
  * Exception thrown when a candidate is not found in the system.
  * This is a specific exception for better error handling and debugging.
  */
 public class CandidateNotFoundException extends RuntimeException {
 
+    @Getter
     private final String candidateId;
+    @Getter
     private final String email;
 
     public CandidateNotFoundException(String candidateId) {
@@ -33,13 +37,5 @@ public class CandidateNotFoundException extends RuntimeException {
                 return email;
             }
         };
-    }
-
-    public String getCandidateId() {
-        return candidateId;
-    }
-
-    public String getEmail() {
-        return email;
     }
 }
