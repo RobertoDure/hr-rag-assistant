@@ -24,13 +24,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class RateLimitFilter implements Filter {
 
-    @Value("${rate-limit.capacity:100}")
+    @Value("${rate-limit.capacity}")
     private int capacity;
 
-    @Value("${rate-limit.refill-tokens:100}")
+    @Value("${rate-limit.refill-tokens}")
     private int refillTokens;
 
-    @Value("${rate-limit.refill-duration-minutes:1}")
+    @Value("${rate-limit.refill-duration-minutes}")
     private int refillDurationMinutes;
 
     private final Map<String, Bucket> cache = new ConcurrentHashMap<>();
