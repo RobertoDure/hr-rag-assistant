@@ -12,11 +12,25 @@ import java.util.UUID;
 @Repository
 public interface CandidateRankingRepository extends JpaRepository<CandidateRanking, UUID> {
 
+    /**
+     * Retrieve CandidateRanking records by jobAnalysisId ordered by rankingPosition ascending
+     * @param jobAnalysisId The job analysis ID to filter by
+     * @return List of CandidateRanking records
+     */
     @Query("SELECT cr FROM CandidateRanking cr WHERE cr.jobAnalysisId = :jobAnalysisId ORDER BY cr.rankingPosition ASC")
     List<CandidateRanking> findByJobAnalysisIdOrderByRankingPosition(@Param("jobAnalysisId") String jobAnalysisId);
 
+    /**
+     * Retrieve CandidateRanking records by candidateId ordered by jobAnalysis createdAt descending
+     * @param candidateId The candidate ID to filter by
+     * @return List of CandidateRanking records
+     */
     @Query("SELECT cr FROM CandidateRanking cr WHERE cr.candidateId = :candidateId ORDER BY cr.jobAnalysis.createdAt DESC")
     List<CandidateRanking> findByCandidateIdOrderByCreatedAtDesc(@Param("candidateId") UUID candidateId);
 
+    /**
+     * Delete CandidateRanking records by jobAnalysisId
+     * @param jobAnalysisId The job analysis ID to filter by
+     */
     void deleteByJobAnalysisId(String jobAnalysisId);
 }

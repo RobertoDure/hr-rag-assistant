@@ -1,9 +1,7 @@
 package ie.com.rag.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.Type;
 
 import java.util.List;
@@ -11,7 +9,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "candidate_rankings")
-@Data
+@Getter @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class CandidateRanking {
@@ -32,8 +30,8 @@ public class CandidateRanking {
     @Column(name = "ranking_position", nullable = false)
     private Integer rankingPosition;
 
-    @Column(name = "key_highlights", columnDefinition = "TEXT[]")
-    @Type(value = io.hypersistence.utils.hibernate.type.array.ListArrayType.class)
+    @Column(name = "key_highlights")
+    @Type(io.hypersistence.utils.hibernate.type.array.ListArrayType.class)
     private List<String> keyHighlights;
 
     @ManyToOne(fetch = FetchType.LAZY)
