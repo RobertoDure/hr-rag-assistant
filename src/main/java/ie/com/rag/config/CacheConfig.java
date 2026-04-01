@@ -11,18 +11,14 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Redis caching configuration
- */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @EnableCaching
 public class CacheConfig {
 
     @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+    public RedisCacheManager cacheManager(final RedisConnectionFactory connectionFactory) {
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(Duration.ofHours(1))
             .serializeKeysWith(
@@ -32,20 +28,12 @@ public class CacheConfig {
                 RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer())
             );
 
-        // Configure cache-specific TTLs
-        Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
-
-        // Cache for candidate searches - 30 minutes
-        cacheConfigurations.put("candidates", defaultConfig.entryTtl(Duration.ofMinutes(30)));
-
-        // Cache for job analyses - 1 hour
-        cacheConfigurations.put("jobAnalyses", defaultConfig.entryTtl(Duration.ofHours(1)));
-
-        // Cache for vector searches - 15 minutes (more dynamic)
-        cacheConfigurations.put("vectorSearch", defaultConfig.entryTtl(Duration.ofMinutes(15)));
-
-        // Cache for Q&A responses - 2 hours
-        cacheConfigurations.put("qaResponses", defaultConfig.entryTtl(Duration.ofHours(2)));
+        Map<String, RedisCacheConfiguration> cacheConfigurations = Map.of(
+            "candidates", defaultConfig.entryTtl(Duration.ofMinutes(30)),
+            "jobAnalyses", defaultConfig.entryTtl(Duration.ofHours(1)),
+            "vectorSearch", defaultConfig.entryTtl(Duration.ofMinutes(15)),
+            "qaResponses", defaultConfig.entryTtl(Duration.ofHours(2))
+        );
 
         return RedisCacheManager.builder(connectionFactory)
             .cacheDefaults(defaultConfig)
