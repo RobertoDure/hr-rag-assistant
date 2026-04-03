@@ -2,187 +2,243 @@ package ie.com.rag.service;
 
 import ie.com.rag.dto.CandidateDTO;
 import ie.com.rag.utils.TextUtils;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.document.Document;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class RagUploaderService {
 
-    private static final Logger logger = LoggerFactory.getLogger(RagUploaderService.class);
-
     private final CandidateService candidateService;
-
     private final DashboardService dashboardService;
-
     private final RagDocumentService ragDocumentService;
-
     private final NLPSkillExtractorService nlpSkillExtractorService;
+    private final TransactionTemplate transactionTemplate;
 
-    public RagUploaderService(CandidateService candidateService, DashboardService dashboardService,
-                            RagDocumentService ragDocumentService, NLPSkillExtractorService nlpSkillExtractorService) {
-        this.candidateService = candidateService;
-        this.dashboardService = dashboardService;
-        this.ragDocumentService = ragDocumentService;
-        this.nlpSkillExtractorService = nlpSkillExtractorService;
+    /**
+     * Processes an uploaded Curriculum Vitae (CV) file and creates a new candidate record.
+     *
+     * @param file  the uploaded CV multipart file
+     * @param name  the name of the candidate
+     * @param email the email address of the candidate
+     * @param phone the contact number of the candidate
+     * @return the saved candidate data
+     */
+    public CandidateDTO processCV(final MultipartFile file, final String name, final String email, final String phone) {
+        validateInput(file, name, email);
+        log.info("Processing CV upload for candidate: {} ({})", name, email);
+
+        final String originalFilename = resolveOriginalFilename(file);
+        final String contentType = resolveContentType(file);
+
+        final String cvContent = extractTextFromFile(file);
+        log.debug("Extracted CV content length: {} characters", cvContent.length());
+
+        final List<String> skills = extractSkills(cvContent);
+        final String experience = extractExperience(cvContent);
+        final String education = extractEducation(cvContent);
+        final Integer yearsOfExperience = extractYearsOfExperience(cvContent);
+
+        log.debug("Extracted skills: {}", skills);
+        log.debug("Extracted experience: {}", experience);
+        log.debug("Extracted education: {}", education);
+        log.debug("Extracted years of experience: {}", yearsOfExperience);
+
+        final CandidateDTO savedCandidate = transactionTemplate.execute(status -> {
+            final CandidateDTO candidate = candidateService.saveCandidate(
+                    name,
+                    email,
+                    phone,
+                    cvContent,
+                    originalFilename,
+                    skills,
+                    experience,
+                    education,
+                    yearsOfExperience
+            );
+            dashboardService.saveUploadedDocumentInfo(originalFilename, file.getSize(), contentType);
+            return candidate;
+        });
+
+        if (savedCandidate == null) {
+            throw new IllegalStateException("Failed to persist uploaded CV data");
+        }
+
+        try {
+            ragDocumentService.processDocument(cvContent, originalFilename);
+            log.info("CV content processed through RAG service successfully");
+        } catch (final RuntimeException e) {
+            log.warn("Failed to process CV through RAG service for candidate {}: {}", savedCandidate.id(), e.getMessage());
+        }
+
+        log.info("CV processing completed successfully for candidate ID: {}", savedCandidate.id());
+        return savedCandidate;
     }
 
     /**
-     * Process uploaded CV file and extract candidate information
+     * Validates the inputs required for processing a CV upload.
+     *
+     * @param file  the incoming file
+     * @param name  the applicant's name
+     * @param email the applicant's email
      */
-    public CandidateDTO processCV(MultipartFile file, String name, String email, String phone) {
-        try {
-            logger.info("Processing CV upload for candidate: {} ({})", name, email);
+    private void validateInput(final MultipartFile file, final String name, final String email) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("File is required");
+        }
 
-            // Extract text content from the file
-            String cvContent = extractTextFromFile(file);
-            logger.debug("Extracted CV content length: {} characters", cvContent.length());
+        if (!StringUtils.hasText(name)) {
+            throw new IllegalArgumentException("Candidate name is required");
+        }
 
-            // Save document info to dashboard
-            dashboardService.saveUploadedDocumentInfo(
-                file.getOriginalFilename(),
-                file.getSize(),
-                file.getContentType()
-            );
-
-            // Extract structured information from CV content using RAG service
-            List<String> skills = extractSkills(cvContent);
-            String experience = extractExperience(cvContent);
-            String education = extractEducation(cvContent);
-            Integer yearsOfExperience = extractYearsOfExperience(cvContent);
-
-            logger.debug("Extracted skills: {}", skills);
-            logger.debug("Extracted experience: {}", experience);
-            logger.debug("Extracted education: {}", education);
-            logger.debug("Extracted years of experience: {}", yearsOfExperience);
-
-            // Process the CV content through RAG service for chunking and storage
-            try {
-                ragDocumentService.processDocument(cvContent, file.getOriginalFilename());
-                logger.info("CV content processed through RAG service successfully");
-            } catch (Exception e) {
-                logger.warn("Failed to process CV through RAG service: {}", e.getMessage());
-                // Continue processing even if RAG service fails
-            }
-
-            // Save candidate to database
-            CandidateDTO candidate = candidateService.saveCandidate(
-                name, email, phone, cvContent, file.getOriginalFilename(),
-                skills, experience, education, yearsOfExperience
-            );
-
-            logger.info("CV processing completed successfully for candidate ID: {}", candidate.getId());
-            return candidate;
-
-        } catch (Exception e) {
-            logger.error("Error processing CV for candidate {} ({}): {}", name, email, e.getMessage(), e);
-            throw new RuntimeException("Failed to process CV: " + e.getMessage(), e);
+        if (!StringUtils.hasText(email)) {
+            throw new IllegalArgumentException("Candidate email is required");
         }
     }
 
     /**
-     * Extract text content from uploaded file
+     * Extrapolates the original filename from the multipart structure.
+     *
+     * @param file the uploaded file
+     * @return the resolved filename
      */
-    private String extractTextFromFile(MultipartFile file) throws IOException {
+    private String resolveOriginalFilename(final MultipartFile file) {
+        if (!StringUtils.hasText(file.getOriginalFilename())) {
+            throw new IllegalArgumentException("Uploaded filename is required");
+        }
+
+        return file.getOriginalFilename();
+    }
+
+    /**
+     * Resolves the MIME content type from an incoming file upload payload.
+     *
+     * @param file the uploaded object
+     * @return the MIME type, or a default octet-stream flag
+     */
+    private String resolveContentType(final MultipartFile file) {
+        if (StringUtils.hasText(file.getContentType())) {
+            return file.getContentType();
+        }
+
+        return "application/octet-stream";
+    }
+
+    /**
+     * Extracts text content based on the identified content structure, utilizing simple formats or PDF structures.
+     *
+     * @param file the multipart input object
+     * @return the extracted textual payload
+     */
+    private String extractTextFromFile(final MultipartFile file) {
         try {
-            String contentType = file.getContentType();
+            final String contentType = file.getContentType();
             String content;
 
             if (contentType != null && contentType.contains("text")) {
-                // Handle text files
-                content = new String(file.getBytes(), "UTF-8");
-                logger.info("Processing text file: {}", file.getOriginalFilename());
+                content = new String(file.getBytes(), StandardCharsets.UTF_8);
+                log.info("Processing text file: {}", file.getOriginalFilename());
             } else if (contentType != null && contentType.contains("pdf")) {
-                // For PDF files, use Spring AI PDF reader
                 try {
-                    ByteArrayResource resource = new ByteArrayResource(file.getBytes());
-                    PagePdfDocumentReader pdfReader = new PagePdfDocumentReader(resource);
-                    List<Document> documents = pdfReader.get();
+                    final ByteArrayResource resource = new ByteArrayResource(file.getBytes());
+                    final PagePdfDocumentReader pdfReader = new PagePdfDocumentReader(resource);
+                    final List<Document> documents = pdfReader.get();
 
                     content = documents.stream()
-                                .map(Document::getContent)
-                                .collect(Collectors.joining("\n"));
+                            .map(Document::getContent)
+                            .collect(Collectors.joining("\n"));
 
-                    logger.info("PDF file processed successfully: {} pages extracted from {}",
-                              documents.size(), file.getOriginalFilename());
-                } catch (Exception e) {
-                    logger.error("Failed to parse PDF file {}: {}", file.getOriginalFilename(), e.getMessage());
-                    // Fallback to treating as text (though this will likely fail)
-                    content = new String(file.getBytes(), "UTF-8");
+                    log.info("PDF file processed successfully: {} pages extracted from {}",
+                            documents.size(), file.getOriginalFilename());
+                } catch (final RuntimeException e) {
+                    log.warn("Failed to parse PDF file {}, using UTF-8 fallback", file.getOriginalFilename());
+                    content = new String(file.getBytes(), StandardCharsets.UTF_8);
                 }
             } else if (contentType != null && (contentType.contains("word") || contentType.contains("docx"))) {
-                // For Word documents - currently not supported, treat as text
-                logger.warn("Word document processing not fully implemented for {}, treating as text", file.getOriginalFilename());
-                content = new String(file.getBytes(), "UTF-8");
+                log.warn("Word document parsing is not implemented for {}, using UTF-8 fallback", file.getOriginalFilename());
+                content = new String(file.getBytes(), StandardCharsets.UTF_8);
             } else {
-                // Default: treat as text
-                content = new String(file.getBytes(), "UTF-8");
-                logger.warn("Unknown file type {} for {}, treating as text", contentType, file.getOriginalFilename());
+                content = new String(file.getBytes(), StandardCharsets.UTF_8);
+                log.warn("Unknown file type {} for {}, using UTF-8 fallback", contentType, file.getOriginalFilename());
             }
 
-            // Clean the content to remove null bytes and other problematic characters
             if (content != null) {
                 content = TextUtils.sanitizeTextContent(content);
-                logger.debug("Extracted content preview (first 200 chars): {}",
-                           content.length() > 200 ? content.substring(0, 200) + "..." : content);
+                final String preview = content.length() > 200 ? content.substring(0, 200) + "..." : content;
+                log.debug("Extracted content preview (first 200 chars): {}", preview);
             }
 
             return content;
 
-        } catch (IOException e) {
-            logger.error("Error extracting text from file {}: {}", file.getOriginalFilename(), e.getMessage());
-            throw e;
+        } catch (final IOException e) {
+            log.error("Error extracting text from file {}: {}", file.getOriginalFilename(), e.getMessage(), e);
+            throw new IllegalStateException("Failed to extract text from uploaded file", e);
         }
     }
 
     /**
-     * Extract skills from CV content using advanced NLP
+     * Retrieves an extrapolated skillset array utilizing the internal NLP sequence processor.
+     *
+     * @param cvContent the plaintext sequence representing a candidate's CV
+     * @return a collection of identified skills
      */
-    private List<String> extractSkills(String cvContent) {
-        // Use the NLPSkillExtractorService to extract skills
-        List<String> extractedSkills = nlpSkillExtractorService.extractSkills(cvContent);
+    private List<String> extractSkills(final String cvContent) {
+        if (!StringUtils.hasText(cvContent)) {
+            return List.of();
+        }
+
+        final List<String> extractedSkills = nlpSkillExtractorService.extractSkills(cvContent);
 
         if (extractedSkills != null && !extractedSkills.isEmpty()) {
-            logger.info("Extracted skills using NLP: {}", extractedSkills);
+            log.info("Extracted skills using NLP: {}", extractedSkills);
             return extractedSkills;
         }
 
-        // Fallback to simple pattern matching if NLP extraction fails
-        String[] commonSkills = {
+        final String[] commonSkills = {
             "Java", "Python", "JavaScript", "React", "Angular", "Spring", "Node.js",
             "SQL", "PostgreSQL", "MySQL", "MongoDB", "Docker", "Kubernetes",
             "AWS", "Azure", "Git", "Jenkins", "CI/CD", "Agile", "Scrum",
             "HTML", "CSS", "REST API", "Microservices", "Leadership", "Communication"
         };
-        logger.error("Extracted skills using NLP failed : {}", Arrays.toString(commonSkills));
+        log.warn("NLP skill extraction returned no results, using static fallback list");
         return Arrays.stream(commonSkills)
             .filter(skill -> cvContent.toLowerCase().contains(skill.toLowerCase()))
             .toList();
     }
 
     /**
-     * Extract work experience section from CV
+     * Extracts an extrapolated experience block natively from regex parsing heuristics.
+     *
+     * @param cvContent the plaintext sequence
+     * @return the experience paragraph string
      */
-    private String extractExperience(String cvContent) {
-        // Simple experience extraction - look for experience-related sections
-        Pattern experiencePattern = Pattern.compile(
+    private String extractExperience(final String cvContent) {
+        if (!StringUtils.hasText(cvContent)) {
+            return "Experience details not clearly identified";
+        }
+
+        final Pattern experiencePattern = Pattern.compile(
             "(?i)(experience|work history|employment|career)(.*?)(?=education|skills|references|$)",
             Pattern.DOTALL
         );
 
-        Matcher matcher = experiencePattern.matcher(cvContent);
+        final Matcher matcher = experiencePattern.matcher(cvContent);
         if (matcher.find()) {
             return matcher.group(2).trim().substring(0, Math.min(1000, matcher.group(2).trim().length()));
         }
@@ -191,33 +247,36 @@ public class RagUploaderService {
     }
 
     /**
-     * Extract education section from CV
+     * Determines educational credentials relying structurally on generic keyword anchors.
+     *
+     * @param cvContent the target extraction sequence
+     * @return a consolidated representation of the applicant's academic history
      */
-    private String extractEducation(String cvContent) {
-        // Improved education extraction with multiple strategies
+    private String extractEducation(final String cvContent) {
+        if (!StringUtils.hasText(cvContent)) {
+            return "Education details not clearly identified";
+        }
 
-        // Strategy 1: Look for common education section headers
-        Pattern educationHeaderPattern = Pattern.compile(
+        final Pattern educationHeaderPattern = Pattern.compile(
             "(?i)\\b(education|academic|qualifications?|degrees?|diplomas?|certifications?|training|schooling|university|college)\\b[\\s:]*\\n?(.*?)(?=\\n\\s*\\b(experience|work|employment|skills|references|achievements|projects|languages)\\b|$)",
             Pattern.DOTALL
         );
 
-        Matcher headerMatcher = educationHeaderPattern.matcher(cvContent);
+        final Matcher headerMatcher = educationHeaderPattern.matcher(cvContent);
         if (headerMatcher.find()) {
-            String educationContent = headerMatcher.group(2).trim();
-            if (educationContent.length() > 10) { // Ensure we have meaningful content
+            final String educationContent = headerMatcher.group(2).trim();
+            if (educationContent.length() > 10) {
                 return educationContent.substring(0, Math.min(1000, educationContent.length()));
             }
         }
 
-        // Strategy 2: Look for degree patterns (Bachelor's, Master's, PhD, etc.)
-        Pattern degreePattern = Pattern.compile(
+        final Pattern degreePattern = Pattern.compile(
             "(?i)\\b(bachelor'?s?|master'?s?|phd|doctorate|associate|diploma|certificate|b\\.?[a-z]{1,4}|m\\.?[a-z]{1,4}|ph\\.?d\\.?)\\s+(of|in|degree)\\s+[a-zA-Z\\s,]+",
             Pattern.CASE_INSENSITIVE
         );
 
-        Matcher degreeMatcher = degreePattern.matcher(cvContent);
-        StringBuilder educationInfo = new StringBuilder();
+        final Matcher degreeMatcher = degreePattern.matcher(cvContent);
+        final StringBuilder educationInfo = new StringBuilder();
 
         while (degreeMatcher.find()) {
             if (educationInfo.length() > 0) {
@@ -230,14 +289,13 @@ public class RagUploaderService {
             return educationInfo.toString();
         }
 
-        // Strategy 3: Look for university/college names
-        Pattern institutionPattern = Pattern.compile(
+        final Pattern institutionPattern = Pattern.compile(
             "(?i)\\b(university|college|institute|academy|school)\\s+of\\s+[a-zA-Z\\s,]+|[a-zA-Z\\s,]+\\s+(university|college|institute)",
             Pattern.CASE_INSENSITIVE
         );
 
-        Matcher institutionMatcher = institutionPattern.matcher(cvContent);
-        StringBuilder institutionInfo = new StringBuilder();
+        final Matcher institutionMatcher = institutionPattern.matcher(cvContent);
+        final StringBuilder institutionInfo = new StringBuilder();
 
         while (institutionMatcher.find()) {
             if (institutionInfo.length() > 0) {
@@ -254,21 +312,30 @@ public class RagUploaderService {
     }
 
     /**
-     * Extract years of experience from CV content
+     * Intercepts quantifiable indicators identifying years of experience related conceptually.
+     *
+     * @param cvContent the analyzed text blob
+     * @return an integer reflecting the extracted years
      */
-    private Integer extractYearsOfExperience(String cvContent) {
-        // Look for patterns like "5 years", "10+ years", etc.
-        Pattern yearsPattern = Pattern.compile("(\\d+)\\+?\\s*years?\\s*(?:of\\s*)?(?:experience|work)", Pattern.CASE_INSENSITIVE);
-        Matcher matcher = yearsPattern.matcher(cvContent);
+    private Integer extractYearsOfExperience(final String cvContent) {
+        if (!StringUtils.hasText(cvContent)) {
+            return null;
+        }
+
+        final Pattern yearsPattern = Pattern.compile(
+                "(\\d+)\\+?\\s*years?\\s*(?:of\\s*)?(?:experience|work)",
+                Pattern.CASE_INSENSITIVE
+        );
+        final Matcher matcher = yearsPattern.matcher(cvContent);
 
         if (matcher.find()) {
             try {
                 return Integer.parseInt(matcher.group(1));
-            } catch (NumberFormatException e) {
-                logger.warn("Could not parse years of experience: {}", matcher.group(1));
+            } catch (final NumberFormatException e) {
+                log.warn("Could not parse years of experience value: {}", matcher.group(1));
             }
         }
 
-        return null; // Unknown years of experience
+        return null;
     }
 }

@@ -11,8 +11,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
@@ -35,38 +39,35 @@ public class UserService {
      * @throws IllegalArgumentException if username or email already exists
      */
     @Transactional
-    public UserResponseDTO registerUser(RegisterRequestDTO request) {
-        log.info("Attempting to register new user: {}", request.getUsername());
+    public UserResponseDTO registerUser(final RegisterRequestDTO request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Registration request cannot be null");
+        }
+
+        log.info("Attempting to register new user: {}", request.username());
 
         // Validate username uniqueness
-        if (userRepository.existsByUsername(request.getUsername())) {
-            log.warn("Username already exists: {}", request.getUsername());
-            throw new IllegalArgumentException("Username already exists: " + request.getUsername());
+        if (userRepository.existsByUsername(request.username())) {
+            log.warn("Username already exists: {}", request.username());
+            throw new IllegalArgumentException("Username already exists: " + request.username());
         }
 
         // Validate email uniqueness
-        if (userRepository.existsByEmail(request.getEmail())) {
-            log.warn("Email already exists: {}", request.getEmail());
-            throw new IllegalArgumentException("Email already exists: " + request.getEmail());
+        if (userRepository.existsByEmail(request.email())) {
+            log.warn("Email already exists: {}", request.email());
+            throw new IllegalArgumentException("Email already exists: " + request.email());
         }
 
         // Determine role (default to USER if not provided)
-        String userRoleString = null;
-        if (request.getRole() != null && !request.getRole().isEmpty()) {
-            try {
-                userRoleString = UserRole.valueOf(request.getRole()).toString();
-            } catch (IllegalArgumentException e) {
-                log.warn("Invalid role provided: {}, defaulting to USER", request.getRole());
-            }
-        }
+        final String userRoleString = resolveUserRole(request.role());
 
         // Create user entity
-        SystemUser user = SystemUser.builder()
-            .username(request.getUsername())
-            .email(request.getEmail())
-            .password(passwordEncoder.encode(request.getPassword()))
-            .firstName(request.getFirstName())
-            .lastName(request.getLastName())
+        final SystemUser user = SystemUser.builder()
+            .username(request.username())
+            .email(request.email())
+            .password(passwordEncoder.encode(request.password()))
+            .firstName(request.firstName())
+            .lastName(request.lastName())
             .role(userRoleString)
             .enabled(true)
             .accountNonExpired(true)
@@ -75,10 +76,29 @@ public class UserService {
             .build();
 
         // Save user
-        SystemUser savedUser = userRepository.save(user);
+        final SystemUser savedUser = userRepository.save(user);
         log.info("Successfully registered user: {} with ID: {}", savedUser.getUsername(), savedUser.getId());
 
         return mapToUserResponseDTO(savedUser);
+    }
+
+    /**
+     * Resolves a user role string into a valid system role name, defaulting to USER if unspecified or invalid.
+     *
+     * @param roleValue the requested role value
+     * @return the string representation of the resolved role
+     */
+    private String resolveUserRole(final String roleValue) {
+        if (!StringUtils.hasText(roleValue)) {
+            return UserRole.USER.toString();
+        }
+
+        try {
+            return UserRole.valueOf(roleValue.trim().toUpperCase(Locale.ROOT)).toString();
+        } catch (final IllegalArgumentException e) {
+            log.warn("Invalid role provided: {}, defaulting to USER", roleValue);
+            return UserRole.USER.toString();
+        }
     }
 
     /**
@@ -87,9 +107,9 @@ public class UserService {
      * @return User response DTO
      * @throws IllegalArgumentException if user not found
      */
-    public UserResponseDTO getUserById(String id) {
+    public UserResponseDTO getUserById(final String id) {
         log.debug("Fetching user by ID: {}", id);
-        SystemUser user = userRepository.findById(id)
+        final SystemUser user = userRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + id));
         return mapToUserResponseDTO(user);
     }
@@ -100,9 +120,9 @@ public class UserService {
      * @return User response DTO
      * @throws IllegalArgumentException if user not found
      */
-    public UserResponseDTO getUserByUsername(String username) {
+    public UserResponseDTO getUserByUsername(final String username) {
         log.debug("Fetching user by username: {}", username);
-        SystemUser user = userRepository.findByUsername(username)
+        final SystemUser user = userRepository.findByUsername(username)
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
         return mapToUserResponseDTO(user);
     }
@@ -136,12 +156,12 @@ public class UserService {
      * @param role User role
      * @return List of user response DTOs
      */
-    public List<UserResponseDTO> getUsersByRole(String role) {
+    public List<UserResponseDTO> getUsersByRole(final String role) {
         log.debug("Fetching users by role: {}", role);
-        UserRole userRole;
+        final UserRole userRole;
         try {
-            userRole = UserRole.valueOf(role);
-        } catch (IllegalArgumentException e) {
+            userRole = UserRole.valueOf(role.trim().toUpperCase(Locale.ROOT));
+        } catch (final IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid role: " + role);
         }
 
@@ -152,6 +172,34 @@ public class UserService {
     }
 
     /**
+     * Search users with pagination and filters
+     * @param username Username filter
+     * @param email Email filter
+     * @param role Role filter
+     * @param pageable Pagination information
+     * @return Page of user response DTOs
+     */
+    public Page<UserResponseDTO> searchUsers(final String username, final String email, final String role, final Pageable pageable) {
+        log.debug("Searching users with filters - username: {}, email: {}, role: {}", username, email, role);
+        String validRole = null;
+        if (StringUtils.hasText(role)) {
+            try {
+                validRole = UserRole.valueOf(role.trim().toUpperCase(Locale.ROOT)).name();
+            } catch (final IllegalArgumentException e) {
+                // Return empty or throw, we'll throw to inform client
+                throw new IllegalArgumentException("Invalid role: " + role);
+            }
+        }
+
+        return userRepository.searchUsers(
+            StringUtils.hasText(username) ? "%" + username.trim() + "%" : null,
+            StringUtils.hasText(email) ? "%" + email.trim() + "%" : null,
+            validRole,
+            pageable
+        ).map(this::mapToUserResponseDTO);
+    }
+
+    /**
      * Update user
      * @param id User ID
      * @param request Update request containing fields to update
@@ -159,53 +207,53 @@ public class UserService {
      * @throws IllegalArgumentException if user not found or validation fails
      */
     @Transactional
-    public UserResponseDTO updateUser(String id, UpdateUserRequestDTO request) {
+    public UserResponseDTO updateUser(final String id, final UpdateUserRequestDTO request) {
         log.info("Updating user with ID: {}", id);
 
-        SystemUser user = userRepository.findById(id)
+        final SystemUser user = userRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + id));
 
         // Update email if provided and unique
-        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
-            if (userRepository.existsByEmail(request.getEmail())) {
-                throw new IllegalArgumentException("Email already exists: " + request.getEmail());
+        if (request.email() != null && !request.email().equals(user.getEmail())) {
+            if (userRepository.existsByEmail(request.email())) {
+                throw new IllegalArgumentException("Email already exists: " + request.email());
             }
-            user.setEmail(request.getEmail());
+            user.setEmail(request.email());
         }
 
         // Update password if provided
-        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        if (request.password() != null && !request.password().isEmpty()) {
+            user.setPassword(passwordEncoder.encode(request.password()));
         }
 
         // Update other fields if provided
-        if (request.getFirstName() != null) {
-            user.setFirstName(request.getFirstName());
+        if (request.firstName() != null) {
+            user.setFirstName(request.firstName());
         }
-        if (request.getLastName() != null) {
-            user.setLastName(request.getLastName());
+        if (request.lastName() != null) {
+            user.setLastName(request.lastName());
         }
-        if (request.getRole() != null) {
+        if (request.role() != null) {
             try {
-                user.setRole(UserRole.valueOf(request.getRole()).toString());
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid role: " + request.getRole());
+                user.setRole(UserRole.valueOf(request.role()).toString());
+            } catch (final IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid role: " + request.role());
             }
         }
-        if (request.getEnabled() != null) {
-            user.setEnabled(request.getEnabled());
+        if (request.enabled() != null) {
+            user.setEnabled(request.enabled());
         }
-        if (request.getAccountNonExpired() != null) {
-            user.setAccountNonExpired(request.getAccountNonExpired());
+        if (request.accountNonExpired() != null) {
+            user.setAccountNonExpired(request.accountNonExpired());
         }
-        if (request.getAccountNonLocked() != null) {
-            user.setAccountNonLocked(request.getAccountNonLocked());
+        if (request.accountNonLocked() != null) {
+            user.setAccountNonLocked(request.accountNonLocked());
         }
-        if (request.getCredentialsNonExpired() != null) {
-            user.setCredentialsNonExpired(request.getCredentialsNonExpired());
+        if (request.credentialsNonExpired() != null) {
+            user.setCredentialsNonExpired(request.credentialsNonExpired());
         }
 
-        SystemUser updatedUser = userRepository.save(user);
+        final SystemUser updatedUser = userRepository.save(user);
         log.info("Successfully updated user: {}", updatedUser.getUsername());
 
         return mapToUserResponseDTO(updatedUser);
@@ -217,7 +265,7 @@ public class UserService {
      * @throws IllegalArgumentException if user not found
      */
     @Transactional
-    public void deleteUser(String id) {
+    public void deleteUser(final String id) {
         log.info("Deleting user with ID: {}", id);
 
         if (!userRepository.existsById(id)) {
@@ -233,7 +281,7 @@ public class UserService {
      * @param user User entity
      * @return UserResponseDTO
      */
-    private UserResponseDTO mapToUserResponseDTO(SystemUser user) {
+    private UserResponseDTO mapToUserResponseDTO(final SystemUser user) {
         return UserResponseDTO.builder()
             .id(user.getId())
             .username(user.getUsername())

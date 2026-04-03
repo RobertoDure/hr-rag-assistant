@@ -8,8 +8,8 @@ import ie.com.rag.exception.CandidateValidationException;
 import ie.com.rag.exception.CandidateValidationException.ValidationError;
 import ie.com.rag.mapper.CandidateMapperInterface;
 import ie.com.rag.repository.CandidateRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,85 +18,82 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import static ie.com.rag.utils.TextUtils.sanitizeTextContent;
 
-/**
- * Service class for managing candidates using modern Java and Spring Boot practices.
- * Includes proper exception handling, validation, and transaction management.
- */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CandidateService {
 
-    private static final Logger logger = LoggerFactory.getLogger(CandidateService.class);
+    private static final int MIN_YEARS_EXPERIENCE = 0;
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private final CandidateRepository candidateRepository;
     private final CandidateMapperInterface candidateMapper;
 
-    public CandidateService(CandidateRepository candidateRepository,
-                            CandidateMapperInterface candidateMapper) {
-        this.candidateRepository = candidateRepository;
-        this.candidateMapper = candidateMapper;
-    }
-
     /**
-     * Saves a new candidate with comprehensive validation and error handling.
+     * Saves a candidate with the provided details, including sanitization and validation.
+     *
+     * @param name              the candidate's name
+     * @param email             the candidate's email address
+     * @param phone             the candidate's phone number
+     * @param cvContent         the content of the candidate's CV
+     * @param originalFileName  the original file name of the uploaded CV
+     * @param skills            the list of skills associated with the candidate
+     * @param experience        the candidate's experience description
+     * @param education         the candidate's education description
+     * @param yearsOfExperience the number of years of experience
+     * @return the saved candidate as a Data Transfer Object
      */
     @Transactional
-    public CandidateDTO saveCandidate(String name, String email, String phone, String cvContent,
-                                      String originalFileName, List<String> skills, String experience,
-                                      String education, Integer yearsOfExperience) {
+    public CandidateDTO saveCandidate(final String name, final String email, final String phone,
+                                      final String cvContent, final String originalFileName,
+                                      final List<String> skills, final String experience,
+                                      final String education, final Integer yearsOfExperience) {
 
-        // Validate inputs using modern validation approach
-        validateCandidateInputs(name, email, phone, cvContent, originalFileName, yearsOfExperience);
+        validateCandidateInputs(name, email, cvContent, originalFileName, yearsOfExperience, skills);
 
         try {
-            // Sanitize all text content before saving to database
-            var sanitizedName = sanitizeTextContent(name);
-            var sanitizedEmail = sanitizeTextContent(email);
-            var sanitizedPhone = sanitizeTextContent(phone);
-            var sanitizedCvContent = sanitizeTextContent(cvContent);
-            var sanitizedOriginalFileName = sanitizeTextContent(originalFileName);
-            var sanitizedExperience = Optional.ofNullable(experience)
-                    .filter(StringUtils::hasText)
-                    .map(ie.com.rag.utils.TextUtils::sanitizeTextContent)
-                    .orElse(null);
-            var sanitizedEducation = Optional.ofNullable(education)
-                    .filter(StringUtils::hasText)
-                    .map(ie.com.rag.utils.TextUtils::sanitizeTextContent)
-                    .orElse(null);
+            final String sanitizedName = sanitizeTextContent(name);
+            final String sanitizedEmail = sanitizeTextContent(email);
+            final String sanitizedPhone = sanitizeNullableText(phone);
+            final String sanitizedCvContent = sanitizeTextContent(cvContent);
+            final String sanitizedOriginalFileName = sanitizeTextContent(originalFileName);
+            final String sanitizedExperience = sanitizeNullableText(experience);
+            final String sanitizedEducation = sanitizeNullableText(education);
+            final List<String> sanitizedSkills = sanitizeSkills(skills);
 
-
-            Candidate candidate = Candidate.builder()
+            final Candidate candidate = Candidate.builder()
                     .name(sanitizedName)
                     .email(sanitizedEmail)
                     .phone(sanitizedPhone)
                     .cvContent(sanitizedCvContent)
                     .originalFileName(sanitizedOriginalFileName)
-                    .skills(Optional.ofNullable(skills).orElse(List.of()))
+                    .skills(sanitizedSkills)
                     .experience(sanitizedExperience)
                     .education(sanitizedEducation)
                     .yearsOfExperience(yearsOfExperience)
                     .build();
 
-            // Save using repository with proper exception handling
-            var savedCandidate = candidateRepository.save(candidate);
+            final Candidate savedCandidate = candidateRepository.save(candidate);
 
-            logger.info("Candidate saved successfully with ID: {} and email: {}",
-                    savedCandidate.getId(), savedCandidate.getEmail());
+            log.info("Candidate saved successfully with ID: {} and email: {}",
+                    savedCandidate.getId(), sanitizedEmail);
 
-            // Convert to DTO and return
             return candidateMapper.toDTO(savedCandidate);
 
-        } catch (DataIntegrityViolationException e) {
-            logger.error("Data integrity violation when saving candidate with email: {}", email, e);
+        } catch (final DataIntegrityViolationException e) {
+            log.error("Data integrity violation when saving candidate with email: {}", email, e);
             throw new CandidateSaveException(
                     "Failed to save candidate due to data integrity violation",
                     name, email, e
             );
-        } catch (Exception e) {
-            logger.error("Unexpected error saving candidate with email: {}", email, e);
+        } catch (final RuntimeException e) {
+            log.error("Unexpected error saving candidate with email: {}", email, e);
             throw new CandidateSaveException(
                     "Failed to save candidate due to unexpected error",
                     name, email, e
@@ -105,148 +102,136 @@ public class CandidateService {
     }
 
     /**
-     * Retrieves all candidates ordered by creation date in descending order.
-     * Uses modern Optional and stream patterns.
+     * Retrieves all candidates, ordered by creation date in descending order.
+     *
+     * @return a list of all candidates as Data Transfer Objects
      */
     public List<CandidateDTO> getAllCandidates() {
-        try {
-            return candidateRepository.findAllOrderByCreatedAtDesc()
-                    .stream()
-                    .map(candidateMapper::toDTO)
-                    .toList(); // Modern Java method instead of collect(Collectors.toList())
-
-        } catch (Exception e) {
-            logger.error("Error retrieving all candidates", e);
-            throw new RuntimeException("Failed to retrieve candidates", e);
-        }
+        return candidateRepository.findAllOrderByCreatedAtDesc()
+                .stream()
+                .map(candidateMapper::toDTO)
+                .toList();
     }
 
     /**
-     * Retrieves a candidate by their ID using Optional-based approach.
+     * Retrieves a candidate by their unique identifier.
+     *
+     * @param candidateId the unique identifier of the candidate
+     * @return the candidate as a Data Transfer Object
+     * @throws CandidateNotFoundException if the candidate is not found
      */
-    public CandidateDTO getCandidateById(String candidateId) {
+    public CandidateDTO getCandidateById(final String candidateId) {
         if (!StringUtils.hasText(candidateId)) {
             throw new CandidateValidationException("Candidate ID cannot be null or empty");
         }
 
-        try {
-            return candidateRepository.findById(candidateId)
-                    .map(candidateMapper::toDTO)
-                    .orElseThrow(() -> new CandidateNotFoundException(candidateId));
-
-        } catch (CandidateNotFoundException e) {
-            throw e; // Re-throw custom exceptions
-        } catch (Exception e) {
-            logger.error("Error retrieving candidate with ID: {}", candidateId, e);
-            throw new RuntimeException("Failed to retrieve candidate", e);
-        }
+        return candidateRepository.findById(candidateId)
+                .map(candidateMapper::toDTO)
+                .orElseThrow(() -> new CandidateNotFoundException(candidateId));
     }
 
     /**
-     * Deletes a candidate by their ID with proper validation.
+     * Deletes a candidate by their unique identifier.
+     *
+     * @param candidateId the unique identifier of the candidate to delete
+     * @throws CandidateNotFoundException if the candidate does not exist
      */
     @Transactional
-    public void deleteCandidate(String candidateId) {
+    public void deleteCandidate(final String candidateId) {
         if (!StringUtils.hasText(candidateId)) {
             throw new CandidateValidationException("Candidate ID cannot be null or empty");
         }
 
-        try {
-            // Check existence first with more descriptive error
-            if (!candidateRepository.existsById(candidateId)) {
-                throw new CandidateNotFoundException(candidateId);
-            }
-
-            candidateRepository.deleteById(candidateId);
-            logger.info("Candidate deleted successfully with ID: {}", candidateId);
-
-        } catch (CandidateNotFoundException e) {
-            throw e;
-        } catch (Exception e) {
-            logger.error("Error deleting candidate with ID: {}", candidateId, e);
-            throw new RuntimeException("Failed to delete candidate", e);
+        if (!candidateRepository.existsById(candidateId)) {
+            throw new CandidateNotFoundException(candidateId);
         }
+
+        candidateRepository.deleteById(candidateId);
+        log.info("Candidate deleted successfully with ID: {}", candidateId);
     }
 
     /**
-     * Finds a candidate by their email address using Optional pattern.
+     * Finds a candidate by their email address.
+     *
+     * @param email the email address to search for
+     * @return the candidate as a Data Transfer Object
+     * @throws CandidateNotFoundException if no candidate is found with the given email
      */
-    public CandidateDTO findByEmail(String email) {
+    public CandidateDTO findByEmail(final String email) {
         if (!StringUtils.hasText(email)) {
             throw new CandidateValidationException("Email cannot be null or empty");
         }
 
-        try {
-            return candidateRepository.findByEmail(email)
-                    .map(candidateMapper::toDTO)
-                    .orElseThrow(() -> CandidateNotFoundException.byEmail(email));
-
-        } catch (CandidateNotFoundException e) {
-            throw e;
-        } catch (Exception e) {
-            logger.error("Error retrieving candidate with email: {}", email, e);
-            throw new RuntimeException("Failed to retrieve candidate by email", e);
+        final String normalizedEmail = email.trim();
+        if (!isValidEmail(normalizedEmail)) {
+            throw new CandidateValidationException("Email format is invalid");
         }
+
+        return candidateRepository.findByEmail(normalizedEmail)
+                .map(candidateMapper::toDTO)
+                .orElseThrow(() -> CandidateNotFoundException.byEmail(normalizedEmail));
     }
 
     /**
-     * Finds candidates by their years of experience with validation.
+     * Finds candidates within a specified range of years of experience.
+     *
+     * @param minYears the minimum years of experience (inclusive)
+     * @param maxYears the maximum years of experience (inclusive)
+     * @return a list of candidates matching the experience criteria
      */
-    public List<CandidateDTO> findByYearsOfExperience(Integer minYears, Integer maxYears) {
-        // Validate input parameters
-        if (minYears != null && minYears < 0) {
+    public List<CandidateDTO> findByYearsOfExperience(final Integer minYears, final Integer maxYears) {
+        if (minYears != null && minYears < MIN_YEARS_EXPERIENCE) {
             throw new CandidateValidationException("Minimum years of experience cannot be negative");
         }
-        if (maxYears != null && maxYears < 0) {
+        if (maxYears != null && maxYears < MIN_YEARS_EXPERIENCE) {
             throw new CandidateValidationException("Maximum years of experience cannot be negative");
         }
-        if (minYears != null && maxYears != null && minYears > maxYears) {
+
+        final boolean isInvalidRange = minYears != null && maxYears != null && minYears > maxYears;
+        if (isInvalidRange) {
             throw new CandidateValidationException("Minimum years cannot be greater than maximum years");
         }
 
-        try {
-            return candidateRepository.findByYearsOfExperienceBetween(
-                            Optional.ofNullable(minYears).orElse(0),
-                            Optional.ofNullable(maxYears).orElse(Integer.MAX_VALUE)
-                    )
-                    .stream()
-                    .map(candidateMapper::toDTO)
-                    .toList();
-
-        } catch (Exception e) {
-            logger.error("Error retrieving candidates by years of experience: min={}, max={}",
-                    minYears, maxYears, e);
-            throw new RuntimeException("Failed to retrieve candidates by years of experience", e);
-        }
+        final int safeMinYears = Optional.ofNullable(minYears).orElse(MIN_YEARS_EXPERIENCE);
+        final int safeMaxYears = Optional.ofNullable(maxYears).orElse(Integer.MAX_VALUE);
+        return candidateRepository.findByYearsOfExperienceBetween(safeMinYears, safeMaxYears)
+                .stream()
+                .map(candidateMapper::toDTO)
+                .toList();
     }
 
     /**
-     * Searches candidates by their name with improved validation.
+     * Searches for candidates by name, ignoring case.
+     *
+     * @param name the name or partial name to search for
+     * @return a list of candidates whose matching the search criteria
      */
-    public List<CandidateDTO> searchByName(String name) {
+    public List<CandidateDTO> searchByName(final String name) {
         if (!StringUtils.hasText(name)) {
             throw new CandidateValidationException("Search name cannot be null or empty");
         }
 
-        try {
-            return candidateRepository.findByNameContainingIgnoreCase(name.trim())
-                    .stream()
-                    .map(candidateMapper::toDTO)
-                    .toList();
-
-        } catch (Exception e) {
-            logger.error("Error searching candidates by name: {}", name, e);
-            throw new RuntimeException("Failed to search candidates by name", e);
-        }
+        return candidateRepository.findByNameContainingIgnoreCase(name.trim())
+                .stream()
+                .map(candidateMapper::toDTO)
+                .toList();
     }
 
     /**
-     * Validates candidate inputs using modern validation approach with specific error messages.
+     * Validates the input data for creating or updating a candidate.
+     *
+     * @param name              the candidate's name
+     * @param email             the candidate's email address
+     * @param cvContent         the content of the candidate's CV
+     * @param originalFileName  the original file name
+     * @param yearsOfExperience the candidate's years of experience
+     * @param skills            the list of skills
+     * @throws CandidateValidationException if any of the inputs are invalid
      */
-    private void validateCandidateInputs(String name, String email, String phone,
-                                         String cvContent, String originalFileName,
-                                         Integer yearsOfExperience) {
-        var errors = new ArrayList<ValidationError>();
+    private void validateCandidateInputs(final String name, final String email,
+                                         final String cvContent, final String originalFileName,
+                                         final Integer yearsOfExperience, final List<String> skills) {
+        final List<ValidationError> errors = new ArrayList<>();
 
         if (!StringUtils.hasText(name)) {
             errors.add(ValidationError.of("name", "Name is required"));
@@ -266,9 +251,13 @@ public class CandidateService {
             errors.add(ValidationError.of("originalFileName", "Original file name is required"));
         }
 
-        if (yearsOfExperience != null && yearsOfExperience < 0) {
+        if (yearsOfExperience != null && yearsOfExperience < MIN_YEARS_EXPERIENCE) {
             errors.add(ValidationError.of("yearsOfExperience",
                     "Years of experience cannot be negative", yearsOfExperience));
+        }
+
+        if (skills != null && skills.stream().anyMatch(skill -> !StringUtils.hasText(skill))) {
+            errors.add(ValidationError.of("skills", "Skills cannot contain null or blank values"));
         }
 
         if (!errors.isEmpty()) {
@@ -277,12 +266,51 @@ public class CandidateService {
     }
 
     /**
-     * Basic email validation - could be enhanced with more sophisticated patterns.
+     * Sanitizes and deduplicates a list of skills.
+     *
+     * @param skills the list of skills to sanitize
+     * @return a sanitized list of distinct skills
      */
-    private boolean isValidEmail(String email) {
-        return email != null &&
-                email.contains("@") &&
-                email.contains(".") &&
-                email.length() > 5;
+    private List<String> sanitizeSkills(final List<String> skills) {
+        if (skills == null || skills.isEmpty()) {
+            return List.of();
+        }
+
+        final List<String> sanitizedSkills = skills.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .map(ie.com.rag.utils.TextUtils::sanitizeTextContent)
+                .distinct()
+                .toList();
+
+        return sanitizedSkills.isEmpty() ? List.of() : List.copyOf(sanitizedSkills);
+    }
+
+    /**
+     * Sanitizes text input, returning null if the input is empty or blank.
+     *
+     * @param input the text to sanitize
+     * @return the sanitized text, or null if the input is blank
+     */
+    private String sanitizeNullableText(final String input) {
+        if (!StringUtils.hasText(input)) {
+            return null;
+        }
+
+        return sanitizeTextContent(input);
+    }
+
+    /**
+     * Validates an email address format.
+     *
+     * @param email the email address to validate
+     * @return true if the email is valid, false otherwise
+     */
+    private boolean isValidEmail(final String email) {
+        if (!StringUtils.hasText(email)) {
+            return false;
+        }
+
+        return EMAIL_PATTERN.matcher(email.trim()).matches();
     }
 }
