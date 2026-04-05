@@ -1,31 +1,22 @@
 package ie.com.rag.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class CandidateDTO {
-
-    private UUID id;
-    private String name;
-    private String email;
-    private String phone;
-    private String cvContent;
-    @JsonProperty("originalFileName")
-    private String originalFileName;
-    private List<String> skills;
-    private String experience;
-    private String education;
-    private Integer yearsOfExperience;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+public record CandidateDTO(
+        UUID id,
+        String name,
+        String email,
+        String phone,
+        String cvContent,
+        @JsonProperty("originalFileName") String originalFileName,
+        List<String> skills,
+        String experience,
+        String education,
+        Integer yearsOfExperience,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
+) {
 }
