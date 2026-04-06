@@ -17,7 +17,7 @@ public interface CandidateRankingRepository extends JpaRepository<CandidateRanki
      * @param jobAnalysisId The job analysis ID to filter by
      * @return List of CandidateRanking records
      */
-    @Query("SELECT cr FROM CandidateRanking cr WHERE cr.jobAnalysisId = :jobAnalysisId ORDER BY cr.rankingPosition ASC")
+    @Query
     List<CandidateRanking> findByJobAnalysisIdOrderByRankingPosition(@Param("jobAnalysisId") String jobAnalysisId);
 
     /**
@@ -25,7 +25,7 @@ public interface CandidateRankingRepository extends JpaRepository<CandidateRanki
      * @param candidateId The candidate ID to filter by
      * @return List of CandidateRanking records
      */
-    @Query("SELECT cr FROM CandidateRanking cr WHERE cr.candidateId = :candidateId ORDER BY cr.jobAnalysis.createdAt DESC")
+    @Query
     List<CandidateRanking> findByCandidateIdOrderByCreatedAtDesc(@Param("candidateId") UUID candidateId);
 
     /**

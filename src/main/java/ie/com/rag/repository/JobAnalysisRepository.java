@@ -1,6 +1,8 @@
 package ie.com.rag.repository;
 
 import ie.com.rag.entity.JobAnalysis;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,26 +14,45 @@ import java.util.List;
 @Repository
 public interface JobAnalysisRepository extends JpaRepository<JobAnalysis, String> {
 
-    @Query("SELECT j FROM JobAnalysis j ORDER BY j.createdAt DESC")
+    /**
+     * Retrieve all JobAnalysis records ordered by creation date descending
+     * @return List of JobAnalysis records
+     */
+    @Query
     List<JobAnalysis> findAllOrderByCreatedAtDesc();
 
-    @Query("SELECT COUNT(j) FROM JobAnalysis j WHERE j.createdAt >= :startDate")
+    Page<JobAnalysis> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    /**
+     * Count JobAnalysis records created after a specific date
+     * @param startDate The date to filter records
+     * @return Count of JobAnalysis records created after the specified date
+     */
+    @Query
     long countByCreatedAtAfter(@Param("startDate") LocalDateTime startDate);
 
-    @Query("SELECT COUNT(j) FROM JobAnalysis j WHERE j.createdAt >= :startDate AND j.createdAt < :endDate")
+    /**
+     * Count JobAnalysis records created between two dates
+     * @param startDate The start date of the range
+     * @param endDate The end date of the range
+     * @return Count of JobAnalysis records created within the specified date range
+     */
+    @Query
     long countByCreatedAtBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
-    @Query(value = "SELECT * FROM job_analyses ORDER BY created_at DESC LIMIT :limit", nativeQuery = true)
+    /**
+     * Retrieve the most recent N JobAnalysis records ordered by creation date descending
+     * @param limit The number of records to retrieve
+     * @return List of JobAnalysis records
+     */
+    @Query(nativeQuery = true)
     List<JobAnalysis> findTopNOrderByCreatedAtDesc(@Param("limit") int limit);
 
-    @Query(value = """
-        SELECT 
-            DATE(created_at) as date,
-            COUNT(*) as daily_count
-        FROM job_analyses 
-        WHERE created_at >= :startDate
-        GROUP BY DATE(created_at)
-        ORDER BY date
-        """, nativeQuery = true)
+    /**
+     * Retrieve daily counts of JobAnalysis records created since a specific date
+     * @param startDate The date to filter records
+     * @return List of Object arrays containing date and count
+     */
+    @Query(nativeQuery = true)
     List<Object[]> findDailyCountsSince(@Param("startDate") LocalDateTime startDate);
 }

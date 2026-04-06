@@ -11,6 +11,11 @@ import java.time.LocalDateTime;
 @Repository
 public interface UploadedDocumentRepository extends JpaRepository<UploadedDocument, String> {
 
-    @Query("SELECT COUNT(u) FROM UploadedDocument u WHERE u.uploadedAt >= :startDate")
+    /**
+     * Count documents uploaded after a specific date
+     * @param startDate The date to filter uploads
+     * @return Count of documents uploaded after the specified date
+     */
+    @Query
     long countByUploadTimestampAfter(@Param("startDate") LocalDateTime startDate);
 }

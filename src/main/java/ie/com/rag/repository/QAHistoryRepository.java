@@ -11,9 +11,18 @@ import java.util.List;
 @Repository
 public interface QAHistoryRepository extends JpaRepository<QAHistory, String> {
 
-    @Query(value = "SELECT * FROM qa_history ORDER BY timestamp DESC LIMIT :limit", nativeQuery = true)
+    /**
+     * Retrieve the most recent N QA history records ordered by timestamp descending
+     * @param limit The number of records to retrieve
+     * @return List of QAHistory records
+     */
+    @Query(nativeQuery = true)
     List<QAHistory> findTopNOrderByTimestampDesc(@Param("limit") int limit);
 
-    @Query("SELECT q FROM QAHistory q ORDER BY q.timestamp DESC")
+    /**
+     * Retrieve all QA history records ordered by timestamp descending
+     * @return List of QAHistory records
+     */
+    @Query
     List<QAHistory> findAllOrderByTimestampDesc();
 }

@@ -9,6 +9,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 /**
  * Repository for User entity operations
@@ -49,7 +51,7 @@ public interface UserRepository extends JpaRepository<SystemUser, String> {
      * Find all enabled users
      * @return List of enabled users
      */
-    @Query("SELECT u FROM SystemUser u WHERE u.enabled = true ORDER BY u.createdAt DESC")
+    @Query
     List<SystemUser> findAllEnabledUsers();
 
     /**
@@ -57,7 +59,7 @@ public interface UserRepository extends JpaRepository<SystemUser, String> {
      * @param role The user role to filter by
      * @return List of users with the specified role
      */
-    @Query("SELECT u FROM SystemUser u WHERE u.role = :role ORDER BY u.createdAt DESC")
+    @Query
     List<SystemUser> findByRole(@Param("role") UserRole role);
 
     /**
@@ -66,5 +68,19 @@ public interface UserRepository extends JpaRepository<SystemUser, String> {
      * @return Number of users with the specified role
      */
     long countByRole(UserRole role);
+
+    /**
+     * Search users by optional username, email, and role filters with pagination
+     * @param username The username to filter by (partial match)
+     * @param email The email to filter by (partial match)
+     * @param role The role to filter by (exact match)
+     * @param pageable Pagination and sorting information
+     * @return Page of users matching the filters
+     */
+    @Query
+    Page<SystemUser> searchUsers(@Param("username") String username, 
+                                 @Param("email") String email, 
+                                 @Param("role") String role, 
+                                 Pageable pageable);
 }
 
