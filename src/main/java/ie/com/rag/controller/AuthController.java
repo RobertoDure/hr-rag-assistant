@@ -1,10 +1,8 @@
 package ie.com.rag.controller;
 
-import ie.com.rag.dto.AuthErrorResponseDTO;
 import ie.com.rag.dto.LoginRequestDTO;
 import ie.com.rag.dto.LoginResponseDTO;
 import ie.com.rag.security.JwtTokenProvider;
-import ie.com.rag.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,24 +12,22 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.DisabledException;
-import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
+import java.util.Map;
 
-/**
- * REST Controller for authentication operations
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/auth")
@@ -41,166 +37,60 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserRepository userRepository;
 
-    @Value("${jwt.expiration}")
-    private Long jwtExpiration;
-
-    /**
-     * Authenticate user and generate JWT token
-     *
-     * @param loginRequest Login credentials
-     * @return JWT token and user information
-     */
     @PostMapping("/login")
     @Operation(summary = "User login", description = "Authenticate user with username and password")
     @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "Successfully authenticated",
-            content = @Content(schema = @Schema(implementation = LoginResponseDTO.class))
-        ),
-        @ApiResponse(
-            responseCode = "401",
-            description = "Invalid credentials",
-            content = @Content(schema = @Schema(implementation = AuthErrorResponseDTO.class))
-        ),
-        @ApiResponse(
-            responseCode = "400",
-            description = "Bad request",
-            content = @Content(schema = @Schema(implementation = AuthErrorResponseDTO.class))
-        )
+            @ApiResponse(responseCode = "200", description = "Successfully authenticated", content = @Content(schema = @Schema(implementation = LoginResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Invalid credentials or account locked/disabled"),
+            @ApiResponse(responseCode = "400", description = "Bad request")
     })
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequestDTO loginRequest) {
-        try {
-            log.info("Login attempt for user: {}", loginRequest.getUsername());
-            log.debug("Password length: {}", loginRequest.getPassword() != null ? loginRequest.getPassword().length() : 0);
+    public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody final LoginRequestDTO loginRequest) {
+        log.info("[RagWiser/AuthController] - login: attempt for user: {}", loginRequest.username());
 
-            // Debug: Check if user exists in database
-            userRepository.findByUsername(loginRequest.getUsername()).ifPresent(user -> {
-                log.debug("User exists in DB - Username: {}, Enabled: {}, Role: {}",
-                    user.getUsername(), user.getEnabled(), user.getRole());
-                log.debug("Account status - NonExpired: {}, NonLocked: {}, CredsNonExpired: {}",
-                    user.getAccountNonExpired(), user.getAccountNonLocked(), user.getCredentialsNonExpired());
-            });
+        final Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(loginRequest.username(), loginRequest.password()));
 
-            // Authenticate the user
-            Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                    loginRequest.getUsername(),
-                    loginRequest.getPassword()
-                )
-            );
+        final UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        final String token = jwtTokenProvider.generateToken(userDetails);
 
-            // Generate JWT token
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            String token = jwtTokenProvider.generateToken(userDetails);
+        final String userRole = authentication.getAuthorities().stream()
+                .findFirst()
+                .map(GrantedAuthority::getAuthority)
+                .map(a -> a.replace("ROLE_", ""))
+                .orElse("USER");
 
-            log.info("User {} successfully authenticated", loginRequest.getUsername());
+        log.info("[RagWiser/AuthController] - login: user {} successfully authenticated", loginRequest.username());
 
-            // Return response with token
-            LoginResponseDTO response = LoginResponseDTO.builder()
+        final LoginResponseDTO response = LoginResponseDTO.builder()
                 .token(token)
                 .type("Bearer")
                 .username(userDetails.getUsername())
-                .expiresIn(jwtExpiration)
+                .role(userRole)
+                .expiresIn(jwtTokenProvider.getExpiration())
                 .build();
 
-            return ResponseEntity.ok(response);
-
-        } catch (DisabledException e) {
-            log.warn("Account disabled for user: {}", loginRequest.getUsername());
-
-            AuthErrorResponseDTO error = AuthErrorResponseDTO.builder()
-                .message("Account is disabled")
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error("Unauthorized")
-                .build();
-
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
-
-        } catch (LockedException e) {
-            log.warn("Account locked for user: {}", loginRequest.getUsername());
-
-            AuthErrorResponseDTO error = AuthErrorResponseDTO.builder()
-                .message("Account is locked")
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error("Unauthorized")
-                .build();
-
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
-
-        } catch (BadCredentialsException e) {
-            log.warn("Failed login attempt for user: {} - Bad credentials", loginRequest.getUsername());
-            log.error("BadCredentialsException details: ", e);
-
-            AuthErrorResponseDTO error = AuthErrorResponseDTO.builder()
-                .message("Invalid username or password")
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error("Unauthorized")
-                .build();
-
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
-
-        } catch (AuthenticationException e) {
-            log.warn("Authentication failed for user: {} - {}", loginRequest.getUsername(), e.getClass().getSimpleName());
-            log.error("AuthenticationException details: ", e);
-
-            AuthErrorResponseDTO error = AuthErrorResponseDTO.builder()
-                .message("Authentication failed: " + e.getMessage())
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error("Unauthorized")
-                .build();
-
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
-
-        } catch (Exception e) {
-            log.error("Error during login for user: {}", loginRequest.getUsername(), e);
-
-            AuthErrorResponseDTO error = AuthErrorResponseDTO.builder()
-                .message("An error occurred during authentication")
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error("Internal Server Error")
-                .build();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-        }
+        return ResponseEntity.ok(response);
     }
 
-    /**
-     * Verify token validity
-     *
-     * @param token JWT token
-     * @return Token validation status
-     */
     @GetMapping("/verify")
     @Operation(summary = "Verify token", description = "Check if JWT token is valid and not expired")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Token is valid"),
-        @ApiResponse(responseCode = "401", description = "Token is invalid or expired")
+            @ApiResponse(responseCode = "200", description = "Token is valid"),
+            @ApiResponse(responseCode = "401", description = "Token is invalid or expired")
     })
-    public ResponseEntity<?> verifyToken(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<Map<String, Object>> verifyToken(
+            @RequestHeader("Authorization") final String authHeader) {
         try {
-            // Remove "Bearer " prefix if present
-            if (token != null && token.startsWith("Bearer ")) {
-                token = token.substring(7);
-            }
-
-            String username = jwtTokenProvider.extractUsername(token);
-
-            return ResponseEntity.ok()
-                .body(new java.util.HashMap<String, Object>() {{
-                    put("valid", true);
-                    put("username", username);
-                }});
-
+            final String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader;
+            final String username = jwtTokenProvider.extractUsername(token);
+            return ResponseEntity.ok(Map.of("valid", true, "username", username));
         } catch (Exception e) {
-            log.warn("Invalid token verification attempt", e);
+            log.warn("[RagWiser/AuthController] - verifyToken: invalid token verification attempt", e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new java.util.HashMap<String, Object>() {{
-                    put("valid", false);
-                    put("message", "Invalid or expired token");
-                }});
+                    .body(Map.of("valid", false, "message", "Invalid or expired token"));
         }
     }
 }
+
 

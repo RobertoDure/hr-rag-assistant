@@ -4,122 +4,74 @@ import ie.com.rag.dto.CandidateDTO;
 import ie.com.rag.service.CandidateService;
 import ie.com.rag.service.RagDocumentService;
 import ie.com.rag.service.RagUploaderService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.util.Set;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/rag")
+@RequiredArgsConstructor
+@Tag(name = "RAG Upload", description = "Candidate CV upload and processing APIs")
+@SecurityRequirement(name = "bearerAuth")
 public class RagUploaderController {
 
-    private static final Logger logger = LoggerFactory.getLogger(RagUploaderController.class);
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain"
+    );
 
     private final RagUploaderService ragUploaderService;
     private final RagDocumentService ragDocumentService;
     private final CandidateService candidateService;
 
-    public RagUploaderController(RagUploaderService ragUploaderService, RagDocumentService ragDocumentService,
-                                 CandidateService candidateService) {
-        this.ragUploaderService = ragUploaderService;
-        this.ragDocumentService = ragDocumentService;
-        this.candidateService = candidateService;
-    }
-
-    /**
-     * Endpoint to upload a candidate CV with metadata for processing.
-     * The file is expected to be sent as a multipart/form-data request along with candidate details.
-     *
-     * @param file the CV file to be uploaded
-     * @param name the candidate's name
-     * @param email the candidate's email
-     * @param phone the candidate's phone (optional)
-     * @return ResponseEntity with candidate data or error message
-     */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> uploadDocument(@RequestParam("file") MultipartFile file,
-                                          @RequestParam("name") String name,
-                                          @RequestParam("email") String email,
-                                          @RequestParam(value = "phone", required = false) String phone) {
-        try {
-            // Validate input
-            if (file == null || file.isEmpty()) {
-                return ResponseEntity.badRequest().body("File is required");
-            }
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR_MANAGER', 'USER')")
+    @Operation(summary = "Upload candidate CV", description = "Upload and process a candidate CV through the RAG system")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "CV uploaded and processed successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid file or missing required fields"),
+            @ApiResponse(responseCode = "403", description = "Access denied")
+    })
+    public ResponseEntity<CandidateDTO> uploadDocument(
+            @RequestParam("file") final MultipartFile file,
+            @RequestParam("name") final String name,
+            @RequestParam("email") final String email,
+            @RequestParam(value = "phone", required = false) final String phone) {
 
-            if (name == null || name.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body("Candidate name is required");
-            }
-
-            if (email == null || email.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body("Candidate email is required");
-            }
-
-            // Validate file type
-            String contentType = file.getContentType();
-            if (contentType == null || (!contentType.contains("pdf") && !contentType.contains("text") &&
-                !contentType.contains("document") && !contentType.contains("msword"))) {
-                return ResponseEntity.badRequest().body("Only PDF, DOC, DOCX, and text files are supported");
-            }
-
-            // Check file size (50MB limit)
-            if (file.getSize() > 50 * 1024 * 1024) {
-                return ResponseEntity.badRequest().body("File size must be less than 50MB");
-            }
-
-            logger.info("Processing CV upload for candidate: {} ({})", name, email);
-
-            // Process the CV through the RAG service
-            CandidateDTO candidate = ragUploaderService.processCV(file, name, email, phone);
-            ragDocumentService.processAndStoreFile(file);
-
-            return ResponseEntity.ok(
-                "CV uploaded successfully for candidate: " + name + " (" + email + ")"
-            );
-
-        } catch (Exception e) {
-            logger.error("Unexpected error when uploading CV for candidate {} ({}): {}", name, email, e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                .body("An error occurred while processing the CV: " + e.getMessage());
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().build();
         }
-    }
 
-    /**
-     * Get all candidates
-     */
-    @GetMapping("/candidates")
-    public ResponseEntity<?> getAllCandidates() {
-        try {
-            return ResponseEntity.ok(candidateService.getAllCandidates());
-        } catch (Exception e) {
-            logger.error("Error retrieving candidates: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                .body("Error retrieving candidates: " + e.getMessage());
+        final String contentType = file.getContentType();
+        final boolean isAllowedType = contentType != null && ALLOWED_CONTENT_TYPES.contains(contentType);
+        if (!isAllowedType) {
+            return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).build();
         }
-    }
 
-    /**
-     * Get candidate by ID
-     */
-    @GetMapping("/candidates/{id}")
-    public ResponseEntity<?> getCandidateById(@PathVariable String id) {
-        try {
-            CandidateDTO candidate = candidateService.getCandidateById(id);
-            return ResponseEntity.ok(candidate);
-        } catch (Exception e) {
-            logger.error("Error retrieving candidate with ID {}: {}", id, e.getMessage(), e);
-            return ResponseEntity.notFound().build();
-        }
-    }
+        log.info("[RagWiser/RagUploaderController] - uploadDocument: processing CV for candidate: {} ({})", name, email);
 
-    /**
-     * Health check endpoint
-     */
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Upload service is running");
+        final CandidateDTO candidate = ragUploaderService.processCV(file, name, email, phone);
+        ragDocumentService.processAndStoreFile(file);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(candidate);
     }
 }
+

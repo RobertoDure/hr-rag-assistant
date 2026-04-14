@@ -15,18 +15,24 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
 
-/**
- * REST Controller for user management operations
- * Provides endpoints for user registration, retrieval, update, and deletion
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/users")
@@ -37,248 +43,119 @@ public class UserController {
 
     private final UserService userService;
 
-    /**
-     * Register a new user (Admin only)
-     * @param request Registration request
-     * @return Created user details
-     */
     @PostMapping("/register")
-    //@PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Register new user", description = "Create a new user account (Admin only)")
     @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "201",
-            description = "User successfully registered",
-            content = @Content(schema = @Schema(implementation = UserResponseDTO.class))
-        ),
-        @ApiResponse(
-            responseCode = "400",
-            description = "Invalid input or username/email already exists"
-        ),
-        @ApiResponse(
-            responseCode = "403",
-            description = "Access denied - Admin role required"
-        )
+            @ApiResponse(responseCode = "201", description = "User successfully registered", content = @Content(schema = @Schema(implementation = UserResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid input or username/email already exists"),
+            @ApiResponse(responseCode = "403", description = "Access denied - Admin role required")
     })
-    public ResponseEntity<UserResponseDTO> registerUser(
-        @Valid @RequestBody RegisterRequestDTO request
-    ) {
-        log.info("Received registration request for username: {}", request.getUsername());
-        try {
-            UserResponseDTO user = userService.registerUser(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(user);
-        } catch (IllegalArgumentException e) {
-            log.error("Registration failed: {}", e.getMessage());
-            throw e;
-        }
+    public ResponseEntity<UserResponseDTO> registerUser(@Valid @RequestBody final RegisterRequestDTO request) {
+        log.info("[RagWiser/UserController] - registerUser: received registration request for username: {}", request.username());
+        final UserResponseDTO user = userService.registerUser(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
 
-    /**
-     * Get user by ID (Admin only)
-     * @param id User ID
-     * @return User details
-     */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get user by ID", description = "Retrieve user details by ID (Admin only)")
     @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "User found",
-            content = @Content(schema = @Schema(implementation = UserResponseDTO.class))
-        ),
-        @ApiResponse(
-            responseCode = "404",
-            description = "User not found"
-        ),
-        @ApiResponse(
-            responseCode = "403",
-            description = "Access denied - Admin role required"
-        )
+            @ApiResponse(responseCode = "200", description = "User found", content = @Content(schema = @Schema(implementation = UserResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "User not found"),
+            @ApiResponse(responseCode = "403", description = "Access denied - Admin role required")
     })
     public ResponseEntity<UserResponseDTO> getUserById(
-        @Parameter(description = "User ID") @PathVariable String id
-    ) {
-        log.info("Fetching user by ID: {}", id);
-        UserResponseDTO user = userService.getUserById(id);
-        return ResponseEntity.ok(user);
+            @Parameter(description = "User ID") @PathVariable final String id) {
+        log.info("[RagWiser/UserController] - getUserById: fetching user by ID: {}", id);
+        return ResponseEntity.ok(userService.getUserById(id));
     }
 
-    /**
-     * Get user by username (Admin only)
-     * @param username Username
-     * @return User details
-     */
     @GetMapping("/username/{username}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get user by username", description = "Retrieve user details by username (Admin only)")
     @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "User found",
-            content = @Content(schema = @Schema(implementation = UserResponseDTO.class))
-        ),
-        @ApiResponse(
-            responseCode = "404",
-            description = "User not found"
-        ),
-        @ApiResponse(
-            responseCode = "403",
-            description = "Access denied - Admin role required"
-        )
+            @ApiResponse(responseCode = "200", description = "User found", content = @Content(schema = @Schema(implementation = UserResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "User not found"),
+            @ApiResponse(responseCode = "403", description = "Access denied - Admin role required")
     })
     public ResponseEntity<UserResponseDTO> getUserByUsername(
-        @Parameter(description = "Username") @PathVariable String username
-    ) {
-        log.info("Fetching user by username: {}", username);
-        UserResponseDTO user = userService.getUserByUsername(username);
-        return ResponseEntity.ok(user);
+            @Parameter(description = "Username") @PathVariable final String username) {
+        log.info("[RagWiser/UserController] - getUserByUsername: fetching user by username: {}", username);
+        return ResponseEntity.ok(userService.getUserByUsername(username));
     }
 
-    /**
-     * Get all users (Admin only)
-     * @return List of all users
-     */
-    @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Get all users", description = "Retrieve all users (Admin only)")
-    @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "Users retrieved successfully"
-        ),
-        @ApiResponse(
-            responseCode = "403",
-            description = "Access denied - Admin role required"
-        )
-    })
-    public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
-        log.info("Fetching all users");
-        List<UserResponseDTO> users = userService.getAllUsers();
-        return ResponseEntity.ok(users);
-    }
-
-    /**
-     * Get all enabled users (Admin only)
-     * @return List of enabled users
-     */
     @GetMapping("/enabled")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get enabled users", description = "Retrieve all enabled users (Admin only)")
     @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "Enabled users retrieved successfully"
-        ),
-        @ApiResponse(
-            responseCode = "403",
-            description = "Access denied - Admin role required"
-        )
+            @ApiResponse(responseCode = "200", description = "Enabled users retrieved successfully"),
+            @ApiResponse(responseCode = "403", description = "Access denied - Admin role required")
     })
     public ResponseEntity<List<UserResponseDTO>> getEnabledUsers() {
-        log.info("Fetching enabled users");
-        List<UserResponseDTO> users = userService.getAllEnabledUsers();
-        return ResponseEntity.ok(users);
+        log.info("[RagWiser/UserController] - getEnabledUsers: fetching enabled users");
+        return ResponseEntity.ok(userService.getAllEnabledUsers());
     }
 
-    /**
-     * Get users by role (Admin only)
-     * @param role User role (ADMIN, USER, HR_MANAGER)
-     * @return List of users with specified role
-     */
     @GetMapping("/role/{role}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get users by role", description = "Retrieve users by role (Admin only)")
     @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "Users retrieved successfully"
-        ),
-        @ApiResponse(
-            responseCode = "400",
-            description = "Invalid role"
-        ),
-        @ApiResponse(
-            responseCode = "403",
-            description = "Access denied - Admin role required"
-        )
+            @ApiResponse(responseCode = "200", description = "Users retrieved successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid role"),
+            @ApiResponse(responseCode = "403", description = "Access denied - Admin role required")
     })
     public ResponseEntity<List<UserResponseDTO>> getUsersByRole(
-        @Parameter(description = "User role (ADMIN, USER, HR_MANAGER)") @PathVariable String role
-    ) {
-        log.info("Fetching users by role: {}", role);
-        List<UserResponseDTO> users = userService.getUsersByRole(role);
-        return ResponseEntity.ok(users);
+            @Parameter(description = "User role (ADMIN, USER, HR_MANAGER)") @PathVariable final String role) {
+        log.info("[RagWiser/UserController] - getUsersByRole: fetching users by role: {}", role);
+        return ResponseEntity.ok(userService.getUsersByRole(role));
     }
 
-    /**
-     * Update user (Admin only)
-     * @param id User ID
-     * @param request Update request
-     * @return Updated user details
-     */
+    @GetMapping("/search")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Search users", description = "Search users with pagination and filters (Admin only)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Users retrieved successfully")
+    })
+    public ResponseEntity<Page<UserResponseDTO>> searchUsers(
+            @Parameter(description = "Username filter") @RequestParam(required = false) final String username,
+            @Parameter(description = "Email filter") @RequestParam(required = false) final String email,
+            @Parameter(description = "Role filter") @RequestParam(required = false) final String role,
+            @Parameter(description = "Page number (0-indexed)") @RequestParam(defaultValue = "0") final int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "10") final int size) {
+        log.info("[RagWiser/UserController] - searchUsers: page={}, size={}, filters: username={}, email={}, role={}", page, size, username, email, role);
+        return ResponseEntity.ok(userService.searchUsers(username, email, role, PageRequest.of(page, size)));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update user", description = "Update user details (Admin only)")
     @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "User updated successfully",
-            content = @Content(schema = @Schema(implementation = UserResponseDTO.class))
-        ),
-        @ApiResponse(
-            responseCode = "400",
-            description = "Invalid input"
-        ),
-        @ApiResponse(
-            responseCode = "404",
-            description = "User not found"
-        ),
-        @ApiResponse(
-            responseCode = "403",
-            description = "Access denied - Admin role required"
-        )
+            @ApiResponse(responseCode = "200", description = "User updated successfully", content = @Content(schema = @Schema(implementation = UserResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid input"),
+            @ApiResponse(responseCode = "404", description = "User not found"),
+            @ApiResponse(responseCode = "403", description = "Access denied - Admin role required")
     })
     public ResponseEntity<UserResponseDTO> updateUser(
-        @Parameter(description = "User ID") @PathVariable String id,
-        @Valid @RequestBody UpdateUserRequestDTO request
-    ) {
-        log.info("Updating user with ID: {}", id);
-        UserResponseDTO user = userService.updateUser(id, request);
-        return ResponseEntity.ok(user);
+            @Parameter(description = "User ID") @PathVariable final String id,
+            @Valid @RequestBody final UpdateUserRequestDTO request) {
+        log.info("[RagWiser/UserController] - updateUser: updating user with ID: {}", id);
+        return ResponseEntity.ok(userService.updateUser(id, request));
     }
 
-    /**
-     * Delete user (Admin only)
-     * @param id User ID
-     * @return Success message
-     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Delete user", description = "Delete user account (Admin only)")
     @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "User deleted successfully"
-        ),
-        @ApiResponse(
-            responseCode = "404",
-            description = "User not found"
-        ),
-        @ApiResponse(
-            responseCode = "403",
-            description = "Access denied - Admin role required"
-        )
+            @ApiResponse(responseCode = "200", description = "User deleted successfully"),
+            @ApiResponse(responseCode = "404", description = "User not found"),
+            @ApiResponse(responseCode = "403", description = "Access denied - Admin role required")
     })
     public ResponseEntity<Map<String, String>> deleteUser(
-        @Parameter(description = "User ID") @PathVariable String id
-    ) {
-        log.info("Deleting user with ID: {}", id);
+            @Parameter(description = "User ID") @PathVariable final String id) {
+        log.info("[RagWiser/UserController] - deleteUser: deleting user with ID: {}", id);
         userService.deleteUser(id);
-        return ResponseEntity.ok(Map.of(
-            "message", "User deleted successfully",
-            "userId", id
-        ));
+        return ResponseEntity.ok(Map.of("message", "User deleted successfully", "userId", id));
     }
 }
 
