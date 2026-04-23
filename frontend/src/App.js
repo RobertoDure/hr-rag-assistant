@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Navbar, Nav, Tab, Tabs, Alert, Button } from 'react-bootstrap';
+import { Alert } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import axios from 'axios';
 
+import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import DocumentUpload from './components/DocumentUpload';
 import CandidateList from './components/CandidateList';
 import JobAnalysisForm from './components/JobAnalysisForm';
 import Login from './components/Login';
+import UserRegistration from './components/UserRegistration';
+import UserManagement from './components/UserManagement';
 import authService from './authService';
 
 function App() {
@@ -17,16 +20,20 @@ function App() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [username, setUsername] = useState('User');
+  const [userRole, setUserRole] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is authenticated
     const checkAuth = async () => {
       if (authService.isAuthenticated()) {
         const storedUsername = authService.getUsername();
+        const storedRole = authService.getRole();
         if (storedUsername) {
           setUsername(storedUsername);
+        }
+        if (storedRole) {
+          setUserRole(storedRole);
         }
         setIsAuthenticated(true);
         fetchCandidates();
@@ -38,19 +45,16 @@ function App() {
 
     checkAuth();
 
-    // Add axios interceptor to handle 401 errors
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response && error.response.status === 401) {
-          // Token expired or invalid - log user out
           handleLogout();
         }
         return Promise.reject(error);
       }
     );
 
-    // Cleanup interceptor on unmount
     return () => {
       axios.interceptors.response.eject(interceptor);
     };
@@ -80,95 +84,80 @@ function App() {
   };
 
   const handleLogout = () => {
-    // Clear authentication data
     authService.logout();
     setIsAuthenticated(false);
     setUsername('User');
+    setUserRole(null);
     setCandidates([]);
   };
 
   const handleLoginSuccess = (data) => {
     setUsername(data.username || 'User');
+    setUserRole(data.role || 'USER');
     setIsAuthenticated(true);
     fetchCandidates();
   };
 
-  // Show loading spinner while checking authentication
   if (authLoading) {
     return (
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-        <div className="text-center">
-          <div className="spinner-border text-primary" role="status">
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--content-bg)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner-border" role="status" style={{ width: '2.5rem', height: '2.5rem' }}>
             <span className="visually-hidden">Loading...</span>
           </div>
-          <p className="mt-3">Loading...</p>
+          <p style={{ marginTop: '16px', color: 'var(--text-secondary)' }}>Loading...</p>
         </div>
-      </Container>
+      </div>
     );
   }
 
-  // Show login screen if not authenticated
   if (!isAuthenticated) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return <Dashboard />;
+      case 'upload':
+        return <DocumentUpload onCandidateAdded={handleCandidateAdded} />;
+      case 'candidates':
+        return (
+          <CandidateList
+            candidates={candidates}
+            onCandidateDeleted={handleCandidateDeleted}
+            loading={loading}
+          />
+        );
+      case 'analysis':
+        return <JobAnalysisForm />;
+      case 'users':
+        return userRole === 'ADMIN' ? <UserManagement /> : <Dashboard />;
+      default:
+        return <Dashboard />;
+    }
+  };
+
   return (
     <div className="App">
-      <Navbar bg="primary" variant="dark" expand="lg" className="mb-4">
-        <Container>
-          <Navbar.Brand href="#dashboard">
-            <strong>HR RagWiser</strong>
-          </Navbar.Brand>
-          <Navbar.Text className="text-light me-auto">
-            Intelligent Candidate Management System
-          </Navbar.Text>
-          <Navbar.Text className="text-light me-3">
-            Welcome, <strong>{username}</strong>
-          </Navbar.Text>
-          <Button
-            variant="outline-light"
-            size="sm"
-            onClick={handleLogout}
-          >
-            Logout
-          </Button>
-        </Container>
-      </Navbar>
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        username={username}
+        userRole={userRole}
+        onLogout={handleLogout}
+      />
 
-      <Container fluid>
-        {error && (
-          <Alert variant="danger" dismissible onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
-        <Tabs
-          activeKey={activeTab}
-          onSelect={(k) => setActiveTab(k)}
-          className="mb-4"
-          variant="pills"
-        >
-          <Tab eventKey="dashboard" title="📊 Dashboard">
-            <Dashboard />
-          </Tab>
-
-          <Tab eventKey="upload" title="📄 Upload CV">
-            <DocumentUpload onCandidateAdded={handleCandidateAdded} />
-          </Tab>
-
-          <Tab eventKey="candidates" title="👥 Candidates">
-            <CandidateList
-              candidates={candidates}
-              onCandidateDeleted={handleCandidateDeleted}
-              loading={loading}
-            />
-          </Tab>
-
-          <Tab eventKey="analysis" title="🔍 Job Analysis">
-            <JobAnalysisForm />
-          </Tab>
-        </Tabs>
-      </Container>
+      <main className="app-main">
+        <div className="app-content">
+          {error && (
+            <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-4">
+              {error}
+            </Alert>
+          )}
+          {renderContent()}
+        </div>
+      </main>
     </div>
   );
 }

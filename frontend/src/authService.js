@@ -21,6 +21,7 @@ const authService = {
         // Store authentication data
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('username', response.data.username);
+        localStorage.setItem('userRole', response.data.role || 'USER');
         localStorage.setItem('tokenExpiration', Date.now() + response.data.expiresIn);
       }
 
@@ -37,6 +38,7 @@ const authService = {
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
+    localStorage.removeItem('userRole');
     localStorage.removeItem('tokenExpiration');
   },
 
@@ -54,6 +56,14 @@ const authService = {
    */
   getUsername: () => {
     return localStorage.getItem('username');
+  },
+
+  /**
+   * Get stored user role
+   * @returns {string|null} Role or null if not found
+   */
+  getRole: () => {
+    return localStorage.getItem('userRole');
   },
 
   /**

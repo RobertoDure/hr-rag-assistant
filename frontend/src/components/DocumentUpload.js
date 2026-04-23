@@ -80,7 +80,9 @@ const CandidateUpload = ({ onCandidateUploaded }) => {
 
   return (
     <div>
-      <h2 className="mb-4">Upload Candidate CV</h2>
+      <div className="page-header">
+        <h2>Upload Candidate CV</h2>
+      </div>
 
       <Card>
         <Card.Body>
@@ -141,13 +143,13 @@ const CandidateUpload = ({ onCandidateUploaded }) => {
                 {...getRootProps()}
                 className={`dropzone ${isDragActive ? 'active' : ''}`}
                 style={{
-                  border: '2px dashed #dee2e6',
-                  borderRadius: '8px',
+                  border: '2px dashed var(--border-color)',
+                  borderRadius: 'var(--radius-lg)',
                   padding: '40px',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  backgroundColor: isDragActive ? '#f8f9fa' : 'white',
-                  transition: 'all 0.3s ease'
+                  backgroundColor: isDragActive ? 'rgba(54, 179, 126, 0.04)' : '#fafbfc',
+                  transition: 'all 0.2s ease'
                 }}
               >
                 <input {...getInputProps()} />

@@ -88,6 +88,7 @@ function Login({ onLoginSuccess }) {
       // Store token in localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('username', data.username);
+      localStorage.setItem('userRole', data.role || 'USER');
       localStorage.setItem('tokenExpiration', Date.now() + data.expiresIn);
 
       // Call success callback
@@ -110,8 +111,11 @@ function Login({ onLoginSuccess }) {
           <Card className="login-card shadow-lg">
             <Card.Body className="p-5">
               <div className="text-center mb-4">
-                <h2 className="text-primary fw-bold">HR RagWiser</h2>
-                <p className="text-muted">Intelligent Candidate Management System</p>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, background: '#36b37e', borderRadius: 10, marginBottom: 12 }}>
+                  <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.875rem' }}>HR</span>
+                </div>
+                <h2 className="fw-bold">RagWiser</h2>
+                <p className="text-muted">Intelligent Candidate Management</p>
               </div>
 
               {apiError && (
@@ -180,7 +184,7 @@ function Login({ onLoginSuccess }) {
             </Card.Body>
           </Card>
 
-          <div className="text-center mt-3 text-muted">
+          <div className="text-center mt-3" style={{ color: 'rgba(255,255,255,0.35)' }}>
             <small>&copy; 2025 HR RagWiser. All rights reserved.</small>
           </div>
         </Col>

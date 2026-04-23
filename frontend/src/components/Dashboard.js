@@ -278,50 +278,42 @@ const Dashboard = () => {
 
   if (loading && !dashboardData) {
     return (
-      <Container>
-        <div className="text-center py-5">
-          <Spinner animation="border" variant="primary" className="mb-3" />
-          <h4>Loading Dashboard...</h4>
-          <p className="text-muted">Fetching the latest data</p>
-        </div>
-      </Container>
+      <div className="text-center py-5">
+        <Spinner animation="border" className="mb-3" />
+        <h5 style={{ fontWeight: 600 }}>Loading Dashboard...</h5>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Fetching the latest data</p>
+      </div>
     );
   }
 
   return (
-    <Container fluid>
-      {/* Header with refresh and logs */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <div className="page-header">
         <div>
-          <h2>
-            <FaChartLine className="me-2 text-primary" />
-            Dashboard
-          </h2>
+          <h2>Dashboard</h2>
           {lastRefresh && (
-            <small className="text-muted">
+            <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
               <FaClock className="me-1" />
               Last updated: {lastRefresh.toLocaleTimeString()}
             </small>
           )}
         </div>
 
-        <div className="d-flex gap-2">
+        <div className="page-header-actions">
           <Button
             variant="outline-secondary"
             size="sm"
             onClick={() => setShowLogsModal(true)}
-            title="View system logs"
           >
             <FaBug className="me-1" />
             Logs ({logs.length})
           </Button>
 
           <Button
-            variant="outline-primary"
+            variant="primary"
             size="sm"
             onClick={handleRefresh}
             disabled={refreshing}
-            title="Refresh dashboard data"
           >
             <FaRedo className={`me-1 ${refreshing ? 'fa-spin' : ''}`} />
             {refreshing ? 'Refreshing...' : 'Refresh'}
@@ -339,45 +331,45 @@ const Dashboard = () => {
       {dashboardData && (
         <>
           {/* Statistics Cards */}
-          <Row className="mb-4">
+          <Row className="mb-4 g-3">
             <Col md={3}>
-              <Card className="text-center border-0 shadow-sm">
-                <Card.Body>
-                  <FaUsers size={40} className="text-primary mb-2" />
-                  <h3 className="mb-0">{dashboardData.stats.totalCandidates || 0}</h3>
-                  <small className="text-muted">Total Candidates</small>
-                </Card.Body>
-              </Card>
+              <div className="stat-card">
+                <div className="stat-card-icon green">
+                  <FaUsers />
+                </div>
+                <h3>{dashboardData.stats.totalCandidates || 0}</h3>
+                <small>Total Candidates</small>
+              </div>
             </Col>
 
             <Col md={3}>
-              <Card className="text-center border-0 shadow-sm">
-                <Card.Body>
-                  <FaUpload size={40} className="text-success mb-2" />
-                  <h3 className="mb-0">{dashboardData.stats.candidatesThisWeek || 0}</h3>
-                  <small className="text-muted">This Week</small>
-                </Card.Body>
-              </Card>
+              <div className="stat-card">
+                <div className="stat-card-icon blue">
+                  <FaUpload />
+                </div>
+                <h3>{dashboardData.stats.candidatesThisWeek || 0}</h3>
+                <small>This Week</small>
+              </div>
             </Col>
 
             <Col md={3}>
-              <Card className="text-center border-0 shadow-sm">
-                <Card.Body>
-                  <FaClipboardList size={40} className="text-warning mb-2" />
-                  <h3 className="mb-0">{dashboardData.stats.candidatesThisMonth || 0}</h3>
-                  <small className="text-muted">This Month</small>
-                </Card.Body>
-              </Card>
+              <div className="stat-card">
+                <div className="stat-card-icon orange">
+                  <FaClipboardList />
+                </div>
+                <h3>{dashboardData.stats.candidatesThisMonth || 0}</h3>
+                <small>This Month</small>
+              </div>
             </Col>
 
             <Col md={3}>
-              <Card className="text-center border-0 shadow-sm">
-                <Card.Body>
-                  <FaChartLine size={40} className="text-info mb-2" />
-                  <h3 className="mb-0">{dashboardData.stats.avgSkillsPerCandidate || 0}</h3>
-                  <small className="text-muted">Avg Skills/Candidate</small>
-                </Card.Body>
-              </Card>
+              <div className="stat-card">
+                <div className="stat-card-icon purple">
+                  <FaChartLine />
+                </div>
+                <h3>{dashboardData.stats.avgSkillsPerCandidate || 0}</h3>
+                <small>Avg Skills/Candidate</small>
+              </div>
             </Col>
           </Row>
 
@@ -550,7 +542,7 @@ const Dashboard = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </Container>
+    </div>
   );
 };
 

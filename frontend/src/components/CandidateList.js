@@ -66,9 +66,8 @@ const CandidateList = ({ candidates, onCandidateDeleted }) => {
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      <div className="page-header">
         <h2>
-          <FaUsers className="me-2" />
           Candidates ({filteredCandidates.length})
         </h2>
       </div>
@@ -81,17 +80,18 @@ const CandidateList = ({ candidates, onCandidateDeleted }) => {
       )}
 
       {/* Search and Filter Controls */}
-      <Row className="mb-4">
+      <Row className="mb-3 g-3">
         <Col md={6}>
           <InputGroup>
-            <InputGroup.Text>
-              <FaSearch />
+            <InputGroup.Text style={{ background: '#fff', borderRight: 'none', borderColor: 'var(--border-color)' }}>
+              <FaSearch style={{ color: 'var(--text-muted)' }} />
             </InputGroup.Text>
             <Form.Control
               type="text"
               placeholder="Search by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ borderLeft: 'none' }}
             />
           </InputGroup>
         </Col>
