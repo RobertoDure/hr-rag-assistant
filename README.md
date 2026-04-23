@@ -1,12 +1,37 @@
-# HR Rag Assistant
+# HR RagWiser
 
-An intelligent HR management system that leverages Retrieval-Augmented Generation (RAG) and AI to streamline candidate management, CV analysis, and job matching processes.
+An enterprise-grade intelligent HR management system that leverages Retrieval-Augmented Generation (RAG) and AI to streamline candidate management, CV analysis, and job matching processes.
 
 ## 🎯 Overview
 
-HR Rag Assistant is a full-stack application that combines Spring Boot backend with React frontend to provide comprehensive HR management capabilities. The system uses OpenAI's GPT models and vector embeddings to intelligently analyze candidate CVs, match them with job requirements, and provide AI-powered insights.
+HR RagWiser is a production-ready full-stack application that combines Spring Boot 3.3.2 backend with React 18 frontend to provide comprehensive HR management capabilities. The system uses OpenAI's GPT-4 models and PostgreSQL pgvector for semantic search to intelligently analyze candidate CVs, match them with job requirements, and provide AI-powered insights.
+
+### 🆕 Enterprise Features
+- **🔒 Security**: JWT authentication, rate limiting, input validation
+- **⚡ Performance**: Redis caching, database optimization, connection pooling
+- **📊 Monitoring**: Prometheus metrics, health checks, distributed tracing
+- **📚 API Documentation**: Interactive Swagger UI
+- **🧪 Testing**: Comprehensive unit and integration tests with Testcontainers
+- **🔄 Database Migrations**: Flyway for version-controlled schema changes
+- **🛡️ Error Handling**: Global exception handling with detailed error responses
 
 ## ✨ Key Features
+
+### 🔒 Login & Authentication
+- **Secure Access**: JWT-based authentication requiring username and password credentials
+- **Session Management**: Tokens are stored client-side and sent with every API request
+- **Role-aware**: Authenticated users are granted access based on their assigned role (e.g., Admin, User)
+- **Default Credentials**: A default admin account is provided for initial setup (`admin / changeme`)
+
+![Login](docs/login.png)
+
+### 📊 Dashboard & Analytics
+- **Real-time Metrics**: Total candidates, weekly/monthly uploads, skill analytics
+- **Visual Insights**: Top skills distribution, candidate statistics
+- **Activity Tracking**: Recent uploads and system activities
+- **Comprehensive Logging**: System monitoring with exportable logs
+
+![Dashboard](docs/dashboard.png)
 
 ### 📄 Document Processing & RAG
 - **CV Upload & Processing**: Upload PDF, DOC, DOCX, and text files
@@ -26,6 +51,13 @@ HR Rag Assistant is a full-stack application that combines Spring Boot backend w
 
 ![Candidate Management](docs/candidate_management.png)
 
+### 👥 User Management (Admin Only)
+- **Role-based Access Control**: Restrict sensitive functionalities to administrators
+- **Full CRUD Interface**: List all active and disabled users, edit their profile details, and alter system roles
+- **Embedded Registration**: Create new users without leaving the management view
+
+![User Management](docs/user_management.png)
+
 ### 🔍 Job Analysis & Matching
 - **Smart Job Analysis**: Define job requirements with skills, experience, and education criteria
 - **Candidate Ranking**: AI-powered scoring and ranking system (0-100% match)
@@ -38,14 +70,9 @@ HR Rag Assistant is a full-stack application that combines Spring Boot backend w
 
 ![Job Analysis](docs/job_analyze.png)
 
-### 📊 Dashboard & Analytics
-- **Real-time Metrics**: Total candidates, weekly/monthly uploads, skill analytics
-- **Visual Insights**: Top skills distribution, candidate statistics
-- **Activity Tracking**: Recent uploads and system activities
-- **Comprehensive Logging**: System monitoring with exportable logs
+![Job Analysis List](docs/job_analyze-list.png)
 
-![Dashboard](docs/dashboard.png)
-
+![Job Analysis](docs/job_analyze-detail.png)
 
 ## 🏗️ Architecture
 
@@ -98,7 +125,188 @@ frontend/src/
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Java 21+
+- **Java 21+** (Java 23 recommended)
+- **Maven 3.8+**
+- **PostgreSQL 14+** with pgvector extension
+- **Redis 6+** (for caching)
+- **Node.js 16+** and npm (for frontend)
+- **Docker & Docker Compose** (optional, for containerized deployment)
+- **OpenAI API Key** (required for AI features)
+
+### 1. Environment Setup
+
+Copy the environment template and configure your settings:
+
+```bash
+cp .env.template .env
+```
+
+Edit `.env` file with your actual values:
+```bash
+# CRITICAL: Set your OpenAI API key
+OPENAI_API_KEY=sk-your-actual-openai-api-key-here
+
+# Generate a secure JWT secret (use a 256-bit random string)
+JWT_SECRET=$(openssl rand -base64 32)
+
+# Set strong admin credentials
+SECURITY_USER_NAME=admin
+SECURITY_USER_PASSWORD=your-secure-password-here
+
+# Configure CORS for your frontend domain
+CORS_ALLOWED_ORIGINS=http://localhost:3000,https://your-domain.com
+```
+
+### 2. Database Setup
+
+**Option A: Using Docker Compose (Recommended)**
+```bash
+# Start PostgreSQL and Redis
+docker-compose up -d postgres redis
+
+# Verify services are running
+docker-compose ps
+```
+
+**Option B: Manual Installation**
+```bash
+# Install PostgreSQL with pgvector
+# On Ubuntu/Debian:
+sudo apt-get install postgresql-14 postgresql-14-pgvector
+
+# On macOS:
+brew install postgresql@14
+brew install pgvector
+
+# Install Redis
+# Ubuntu/Debian:
+sudo apt-get install redis-server
+
+# macOS:
+brew install redis
+
+# Create database
+psql -U postgres -c "CREATE DATABASE rag_hr_db;"
+psql -U postgres -d rag_hr_db -c "CREATE EXTENSION vector;"
+```
+
+### 3. Build & Run Backend
+
+```bash
+# Build the application
+./mvnw clean install
+
+# Run tests
+./mvnw test
+
+# Run the application
+./mvnw spring-boot:run
+
+# Or run the JAR
+java -jar target/assistant-0.0.1-SNAPSHOT.jar
+```
+
+Backend will start on `http://localhost:8080`
+
+### 4. Build & Run Frontend
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm start
+```
+
+Frontend will start on `http://localhost:3000`
+
+### 5. Access the Application
+
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8080/api
+- **Swagger UI**: http://localhost:8080/swagger-ui.html
+- **API Docs**: http://localhost:8080/api-docs
+- **Actuator Health**: http://localhost:8080/actuator/health
+- **Prometheus Metrics**: http://localhost:8080/actuator/prometheus
+
+### 6. Authentication
+
+The application uses JWT authentication. To access protected endpoints:
+
+1. **Login** (using default credentials from `.env`):
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "your-password-here"
+  }'
+```
+
+2. **Use the JWT token** in subsequent requests:
+```bash
+curl -X GET http://localhost:8080/api/candidates \
+  -H "Authorization: Bearer your-jwt-token-here"
+```
+
+## 🧪 Testing
+
+### Run Unit Tests
+```bash
+./mvnw test
+```
+
+### Run Integration Tests
+```bash
+./mvnw verify -P integration-tests
+```
+
+### Run All Tests with Coverage
+```bash
+./mvnw clean verify
+```
+
+Test reports will be generated in `target/site/jacoco/index.html`
+
+## 📊 Monitoring & Observability
+
+### Health Checks
+```bash
+# Basic health
+curl http://localhost:8080/actuator/health
+
+# Detailed health (requires authentication)
+curl http://localhost:8080/actuator/health \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Metrics
+```bash
+# Prometheus metrics
+curl http://localhost:8080/actuator/prometheus
+
+# Application metrics
+curl http://localhost:8080/actuator/metrics
+```
+
+### Logging
+Logs are written to:
+- Console (stdout)
+- File: `logs/hr-ragwiser.log` (rotated daily, 30-day retention)
+
+## 🔒 Security Best Practices
+
+1. **Never commit `.env` file** - It contains sensitive credentials
+2. **Rotate JWT secrets regularly** in production
+3. **Use strong passwords** for admin accounts
+4. **Enable HTTPS** in production environments
+5. **Configure CORS** to only allow trusted domains
+6. **Monitor rate limits** and adjust based on usage patterns
+7. **Keep dependencies updated** - Run `./mvnw versions:display-dependency-updates`
+
+## 🚀 Quick Start
 - Node.js 16+
 - Docker & Docker Compose
 - OpenAI API Key
