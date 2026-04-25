@@ -41,8 +41,6 @@ HR RagWiser is a production-ready full-stack application that combines Spring Bo
 
 ![Upload CV](docs/upload_CV.png)
 
-![Uploaded CV](docs/uploaded_CV.png)
-
 ### 👥 Candidate Management
 - **Complete Candidate Profiles**: Name, email, phone, skills, experience, education
 - **Skills Extraction**: Automatic identification of technical and soft skills
