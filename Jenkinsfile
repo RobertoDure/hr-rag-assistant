@@ -18,8 +18,13 @@ pipeline {
         K8S_NAMESPACE = 'hr-ragwiser'
         K8S_DEPLOYMENT_PATH = 'k8s'
         KUBECONFIG = '/var/jenkins_home/kube/config'
+
         // Maven configuration
         MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
+
+        // Quality gates
+        SONAR_HOST_URL = 'http://sonarqube:9000' // Configure SonarQube URL
+        COVERAGE_THRESHOLD = '70' // Minimum code coverage percentage
     }
 
     triggers {
@@ -48,22 +53,110 @@ pipeline {
                 script {
                     echo "=== Building Backend with Maven ==="
                     if (isUnix()) {
-                        sh 'mvn clean install -DskipTests'
+                        sh 'mvn clean compile'
                     } else {
-                        bat 'mvn clean install -DskipTests'
+                        bat 'mvn clean compile'
                     }
                 }
             }
         }
 
-        stage('Test Backend') {
+        stage('Unit Tests') {
             steps {
                 script {
-                    echo "=== Running Backend Tests ==="
+                    echo "=== Running Unit Tests ==="
                     if (isUnix()) {
                         sh 'mvn test'
                     } else {
                         bat 'mvn test'
+                    }
+                }
+            }
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
+                    jacoco(
+                        execPattern: '**/target/jacoco.exec',
+                        classPattern: '**/target/classes',
+                        sourcePattern: '**/src/main/java',
+                        exclusionPattern: '**/test/**'
+                    )
+                }
+            }
+        }
+
+        stage('Integration Tests') {
+            steps {
+                script {
+                    echo "=== Running Integration Tests ==="
+                    if (isUnix()) {
+                        sh 'mvn verify -P integration-tests'
+                    } else {
+                        bat 'mvn verify -P integration-tests'
+                    }
+                }
+            }
+            post {
+                always {
+                    junit '**/target/failsafe-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Code Quality Analysis') {
+            parallel {
+                stage('SonarQube Analysis') {
+                    steps {
+                        script {
+                            echo "=== Running SonarQube Analysis ==="
+                            withSonarQubeEnv('SonarQube') {
+                                if (isUnix()) {
+                                    sh 'mvn sonar:sonar -Dsonar.projectKey=hr-ragwiser'
+                                } else {
+                                    bat 'mvn sonar:sonar -Dsonar.projectKey=hr-ragwiser'
+                                }
+                            }
+                        }
+                    }
+                }
+
+                stage('Dependency Check') {
+                    steps {
+                        script {
+                            echo "=== Running Dependency Security Check ==="
+                            if (isUnix()) {
+                                sh 'mvn dependency-check:check'
+                            } else {
+                                bat 'mvn dependency-check:check'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                script {
+                    echo "=== Waiting for Quality Gate ==="
+                    timeout(time: 10, unit: 'MINUTES') {
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Package') {
+            steps {
+                script {
+                    echo "=== Packaging Application ==="
+                    if (isUnix()) {
+                        sh 'mvn package -DskipTests'
+                    } else {
+                        bat 'mvn package -DskipTests'
                     }
                 }
             }
@@ -76,6 +169,7 @@ pipeline {
                         script {
                             echo "=== Building Backend Docker Image ==="
                             docker.build("${BACKEND_IMAGE}:${IMAGE_TAG}", "-f Dockerfile .")
+                            docker.build("${BACKEND_IMAGE}:latest", "-f Dockerfile .")
                         }
                     }
                 }
@@ -85,7 +179,23 @@ pipeline {
                         script {
                             echo "=== Building Frontend Docker Image ==="
                             docker.build("${FRONTEND_IMAGE}:${IMAGE_TAG}", "-f frontend/Dockerfile ./frontend")
+                            docker.build("${FRONTEND_IMAGE}:latest", "-f frontend/Dockerfile ./frontend")
                         }
+                    }
+                }
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                script {
+                    echo "=== Scanning Docker Images for Vulnerabilities ==="
+                    // Using Trivy for container scanning
+                    if (isUnix()) {
+                        sh """
+                            trivy image --severity HIGH,CRITICAL ${BACKEND_IMAGE}:${IMAGE_TAG}
+                            trivy image --severity HIGH,CRITICAL ${FRONTEND_IMAGE}:${IMAGE_TAG}
+                        """
                     }
                 }
             }

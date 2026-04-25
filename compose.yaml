@@ -1,7 +1,7 @@
 services:
-  pgvector:
+  postgres:
     image: 'pgvector/pgvector:pg16'
-    container_name: 'pgvector'
+    container_name: 'hr-rag-postgres'
     environment:
       - 'POSTGRES_DB=rag_hr_db'
       - 'POSTGRES_PASSWORD=postgres'
@@ -12,6 +12,29 @@ services:
       - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hr-rag-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: 'redis:7-alpine'
+    container_name: 'hr-rag-redis'
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - hr-rag-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
 
   backend:
     container_name: 'hr-rag-backend'
@@ -21,20 +44,54 @@ services:
     ports:
       - '8080:8080'
     depends_on:
-      - pgvector
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://pgvector:5432/rag_hr_db
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/rag_hr_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - SECURITY_USER_NAME=${SECURITY_USER_NAME:-admin}
+      - SECURITY_USER_PASSWORD=${SECURITY_USER_PASSWORD:-changeme}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+    networks:
+      - hr-rag-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
-    container_name: 'hr-rag-frontend'
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - '3000:3000'
-    environment:
-      REACT_APP_BACKEND_URL: http://localhost:8080
+   image: 'node:20-alpine'
+   container_name: 'hr-rag-frontend'
+#    build:
+#      context: ./frontend
+#      dockerfile: Dockerfile
+   ports:
+     - '3000:3000'
+   depends_on:
+     - backend
+   environment:
+     REACT_APP_BACKEND_URL: http://backend:8080
+   volumes:
+     - ./frontend:/app
+     - /app/node_modules
+   working_dir: /app
+   command: [ "sh", "-c", "npm install && npm start" ]
+   networks:
+     - hr-rag-network
+
 volumes:
   postgres_data:
+  redis_data:
+
+networks:
+  hr-rag-network:
+    driver: bridge

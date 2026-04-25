@@ -1,13 +1,13 @@
-FROM openjdk:23-jdk-slim
+FROM eclipse-temurin:21-jdk-ubi10-minimal
 
 # Set working directory
 WORKDIR /app
 
 # Copy the jar file
-COPY target/assistant-0.0.1-SNAPSHOT.jar app.jar
+COPY ./target/assistant-0.0.1-SNAPSHOT.jar app.jar
 
 # Expose port
 EXPOSE 8080
 
 # Run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT [ "sh", "-c", "sleep 20 && java -jar /app/app.jar" ]
