@@ -90,5 +90,7 @@ dump.rdb
 # GitHub and VSCode settings
 .github/
 .vscode/
+!.vscode/
+!.vscode/settings.json
 
 
